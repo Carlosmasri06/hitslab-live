@@ -1,7 +1,7 @@
 "use client";
 
 import { useCopyToClipboard } from "@/lib/clipboard";
-import { ParticipantMetadata, RoomMetadata } from "@/lib/controller";
+import { ParticipantMetadata } from "@/lib/controller";
 import {
   AudioTrack,
   StartAudio,
@@ -12,7 +12,6 @@ import {
   useMediaDeviceSelect,
   useParticipants,
   useRoomContext,
-  useRoomInfo,
   useTracks,
 } from "@livekit/components-react";
 import {
@@ -66,8 +65,17 @@ function ConfettiCanvas() {
   );
 }
 
+const CHAT_LIFETIME = 10000;
+const CHAT_FADE = 2000;
+
 function ChatOverlay() {
   const { chatMessages } = useChat();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, []);
 
   const recent = useMemo(() => {
     const seen = new Set<number>();
@@ -76,24 +84,34 @@ function ChatOverlay() {
       seen.add(m.timestamp);
       return true;
     });
-    return unique.slice(-6);
-  }, [chatMessages]);
+    return unique
+      .filter((m) => now - m.timestamp < CHAT_LIFETIME)
+      .slice(-6);
+  }, [chatMessages, now]);
 
   return (
     <div className="absolute left-3 right-20 bottom-28 z-20 flex flex-col items-start gap-1.5 pointer-events-none">
-      {recent.map((msg) => (
-        <div
-          key={msg.timestamp}
-          className="max-w-full rounded-2xl bg-black/55 backdrop-blur-sm px-3 py-1.5"
-        >
-          <Text size="1" weight="bold" className="text-accent-11 mr-1">
-            {msg.from?.identity ?? "?"}
-          </Text>
-          <Text size="1" className="text-white">
-            {msg.message}
-          </Text>
-        </div>
-      ))}
+      {recent.map((msg) => {
+        const age = now - msg.timestamp;
+        const opacity =
+          age > CHAT_LIFETIME - CHAT_FADE
+            ? Math.max(0, (CHAT_LIFETIME - age) / CHAT_FADE)
+            : 1;
+        return (
+          <div
+            key={msg.timestamp}
+            style={{ opacity }}
+            className="max-w-full rounded-2xl bg-black/55 backdrop-blur-sm px-3 py-1.5 transition-opacity duration-500"
+          >
+            <Text size="1" weight="bold" className="text-accent-11 mr-1">
+              {msg.from?.identity ?? "?"}
+            </Text>
+            <Text size="1" className="text-white">
+              {msg.message}
+            </Text>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -125,10 +143,15 @@ function RightRail() {
         </Text>
       </Flex>
       <Flex direction="column" align="center" gap="1">
-        <div className="h-11 w-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center text-xl opacity-70">
+        <a
+          href="https://www.hitslabtcg.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="h-11 w-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center text-xl"
+        >
           🛍️
-        </div>
-        <Text size="1" className="text-white opacity-70">
+        </a>
+        <Text size="1" className="text-white">
           Tienda
         </Text>
       </Flex>
@@ -244,12 +267,7 @@ function BottomBar({ isHost }: { isHost: boolean }) {
   const [draft, setDraft] = useState("");
   const { send: sendChat } = useChat();
   const { send: sendReaction } = useDataChannel("reactions");
-  const { metadata } = useRoomInfo();
   const [encoder] = useState(() => new TextEncoder());
-
-  const { enable_chat: chatEnabled } = (
-    metadata ? JSON.parse(metadata) : {}
-  ) as RoomMetadata;
 
   const onSend = async () => {
     if (draft.trim().length && sendChat) {
@@ -274,8 +292,7 @@ function BottomBar({ isHost }: { isHost: boolean }) {
         <Box className="flex-1">
           <TextField.Input
             radius="full"
-            disabled={!chatEnabled}
-            placeholder={chatEnabled ? "Escribe algo..." : "Chat desactivado"}
+            placeholder="Escribe algo..."
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyUp={(e) => {
