@@ -16,7 +16,6 @@ import {
   useTracks,
 } from "@livekit/components-react";
 import {
-  CopyIcon,
   EyeClosedIcon,
   EyeOpenIcon,
   PaperPlaneIcon,
@@ -40,7 +39,6 @@ import {
   createLocalTracks,
 } from "livekit-client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MediaDeviceSettings } from "./media-device-settings";
 import { PresenceDialog } from "./presence-dialog";
 import { useAuthToken } from "./token-context";
 
@@ -138,6 +136,110 @@ function RightRail() {
   );
 }
 
+function CameraControls() {
+  const [micEnabled, setMicEnabled] = useState(true);
+  const [camEnabled, setCamEnabled] = useState(true);
+  const { state: roomState } = useRoomContext();
+  const { localParticipant } = useLocalParticipant();
+
+  useEffect(() => {
+    if (roomState === ConnectionState.Connected) {
+      void localParticipant.setMicrophoneEnabled(micEnabled);
+      void localParticipant.setCameraEnabled(camEnabled);
+    }
+  }, [micEnabled, camEnabled, localParticipant, roomState]);
+
+  const { devices, activeDeviceId, setActiveMediaDevice } =
+    useMediaDeviceSelect({ kind: "videoinput" });
+
+  const isFront = (label: string) => label.toLowerCase().includes("front");
+  const frontDevices = devices.filter((d) => isFront(d.label));
+  const backDevices = devices.filter((d) => !isFront(d.label));
+
+  const activeLabel =
+    devices.find((d) => d.deviceId === activeDeviceId)?.label ?? "";
+  const onFront = isFront(activeLabel);
+
+  const pickWide = () =>
+    backDevices.find((d) => {
+      const l = d.label.toLowerCase();
+      return (
+        !l.includes("ultra") &&
+        !l.includes("tele") &&
+        !l.includes("dual") &&
+        !l.includes("triple")
+      );
+    }) ?? backDevices[0];
+
+  const ultra = backDevices.find((d) =>
+    d.label.toLowerCase().includes("ultra")
+  );
+  const wide = pickWide();
+  const tele = backDevices.find((d) => d.label.toLowerCase().includes("tele"));
+
+  const flip = () => {
+    const target = onFront ? wide ?? backDevices[0] : frontDevices[0];
+    if (target) setActiveMediaDevice(target.deviceId);
+  };
+
+  const zoomOptions = [
+    { label: "0.5", device: ultra },
+    { label: "1", device: wide },
+    { label: "2", device: tele },
+  ].filter((z) => z.device);
+
+  return (
+    <Flex align="center" gap="2" wrap="wrap">
+      <Button
+        size="1"
+        radius="full"
+        variant={micEnabled ? "soft" : "surface"}
+        onClick={() => setMicEnabled(!micEnabled)}
+      >
+        {micEnabled ? "🎙️ On" : "🔇 Off"}
+      </Button>
+      <Button
+        size="1"
+        radius="full"
+        variant={camEnabled ? "soft" : "surface"}
+        onClick={() => setCamEnabled(!camEnabled)}
+      >
+        {camEnabled ? "📷 On" : "🚫 Off"}
+      </Button>
+      <Button size="1" radius="full" variant="soft" onClick={flip}>
+        🔄 Voltear
+      </Button>
+      {!onFront && zoomOptions.length > 1 && (
+        <Flex
+          align="center"
+          gap="1"
+          className="rounded-full bg-black/40 backdrop-blur p-1"
+        >
+          {zoomOptions.map((z) => {
+            const active = z.device?.deviceId === activeDeviceId;
+            return (
+              <button
+                key={z.label}
+                onClick={() =>
+                  z.device && setActiveMediaDevice(z.device.deviceId)
+                }
+                className={
+                  "h-8 min-w-[34px] px-2 rounded-full text-xs font-bold transition-colors " +
+                  (active
+                    ? "bg-accent-9 text-black"
+                    : "bg-transparent text-white")
+                }
+              >
+                {z.label}×
+              </button>
+            );
+          })}
+        </Flex>
+      )}
+    </Flex>
+  );
+}
+
 function BottomBar({ isHost }: { isHost: boolean }) {
   const [draft, setDraft] = useState("");
   const { send: sendChat } = useChat();
@@ -167,11 +269,7 @@ function BottomBar({ isHost }: { isHost: boolean }) {
 
   return (
     <Flex direction="column" gap="2">
-      {isHost && (
-        <Flex gap="2" align="center" wrap="wrap">
-          <MediaDeviceSettings />
-        </Flex>
-      )}
+      {isHost && <CameraControls />}
       <Flex gap="2" align="center">
         <Box className="flex-1">
           <TextField.Input
@@ -251,15 +349,20 @@ export function StreamPlayer({ isHost = false }) {
     }
   }, [canHost]);
 
-  const { activeDeviceId: activeCameraDeviceId } = useMediaDeviceSelect({
-    kind: "videoinput",
-  });
+  const { devices: cameraDevices, activeDeviceId: activeCameraDeviceId } =
+    useMediaDeviceSelect({
+      kind: "videoinput",
+    });
 
   useEffect(() => {
     if (localVideoTrack) {
       void localVideoTrack.setDeviceId(activeCameraDeviceId);
     }
   }, [localVideoTrack, activeCameraDeviceId]);
+
+  const activeCamLabel =
+    cameraDevices.find((d) => d.deviceId === activeCameraDeviceId)?.label ?? "";
+  const mirrorSelf = activeCamLabel.toLowerCase().includes("front");
 
   const remoteVideoTracks = useTracks([Track.Source.Camera]).filter(
     (t) => t.participant.identity !== localParticipant.identity
@@ -283,7 +386,10 @@ export function StreamPlayer({ isHost = false }) {
             </Flex>
             <video
               ref={localVideoEl}
-              className="absolute inset-0 w-full h-full object-cover -scale-x-100 bg-transparent"
+              className={
+                "absolute inset-0 w-full h-full object-cover bg-transparent " +
+                (mirrorSelf ? "-scale-x-100" : "")
+              }
             />
           </div>
         )}
