@@ -1,3 +1,5 @@
+"use client";
+
 import { useCopyToClipboard } from "@/lib/clipboard";
 import { ParticipantMetadata, RoomMetadata } from "@/lib/controller";
 import {
@@ -13,11 +15,26 @@ import {
   useRoomInfo,
   useTracks,
 } from "@livekit/components-react";
-import { CopyIcon, EyeClosedIcon, EyeOpenIcon } from "@radix-ui/react-icons";
-import { Avatar, Button, Flex, Grid, Text, TextField } from "@radix-ui/themes";
+import {
+  CopyIcon,
+  EyeClosedIcon,
+  EyeOpenIcon,
+  PaperPlaneIcon,
+} from "@radix-ui/react-icons";
+import {
+  Avatar,
+  Box,
+  Button,
+  Flex,
+  Grid,
+  IconButton,
+  Text,
+  TextField,
+} from "@radix-ui/themes";
 import Confetti from "js-confetti";
 import {
   ConnectionState,
+  DataPacket_Kind,
   LocalVideoTrack,
   Track,
   createLocalTracks,
@@ -46,16 +63,13 @@ function ConfettiCanvas() {
     setConfetti(new Confetti({ canvas: canvasEl?.current ?? undefined }));
   }, []);
 
-  return <canvas ref={canvasEl} className="absolute h-full w-full" />;
+  return (
+    <canvas ref={canvasEl} className="absolute inset-0 h-full w-full z-10" />
+  );
 }
 
-function MobileChatOverlay() {
-  const [draft, setDraft] = useState("");
-  const { chatMessages, send } = useChat();
-  const { metadata } = useRoomInfo();
-  const { enable_chat: chatEnabled } = (
-    metadata ? JSON.parse(metadata) : {}
-  ) as RoomMetadata;
+function ChatOverlay() {
+  const { chatMessages } = useChat();
 
   const recent = useMemo(() => {
     const seen = new Set<number>();
@@ -67,54 +81,148 @@ function MobileChatOverlay() {
     return unique.slice(-6);
   }, [chatMessages]);
 
-  const onSend = async () => {
-    if (draft.trim().length && send) {
-      setDraft("");
-      await send(draft);
-    }
-  };
-
   return (
-    <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col gap-2 p-2 sm:hidden">
-      <div className="flex flex-col items-start gap-1 pointer-events-none">
-        {recent.map((msg) => (
-          <div
-            key={msg.timestamp}
-            className="max-w-[85%] rounded-full bg-black/60 backdrop-blur-sm px-3 py-1"
-          >
-            <Text size="1" weight="bold" className="text-accent-11 mr-1">
-              {msg.from?.identity ?? "?"}
-            </Text>
-            <Text size="1" className="text-white">
-              {msg.message}
-            </Text>
-          </div>
-        ))}
-      </div>
-      <TextField.Input
-        disabled={!chatEnabled}
-        placeholder={chatEnabled ? "Escribe algo..." : "Chat desactivado"}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyUp={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            onSend();
-          }
-        }}
-      />
+    <div className="absolute left-3 right-20 bottom-28 z-20 flex flex-col items-start gap-1.5 pointer-events-none">
+      {recent.map((msg) => (
+        <div
+          key={msg.timestamp}
+          className="max-w-full rounded-2xl bg-black/55 backdrop-blur-sm px-3 py-1.5"
+        >
+          <Text size="1" weight="bold" className="text-accent-11 mr-1">
+            {msg.from?.identity ?? "?"}
+          </Text>
+          <Text size="1" className="text-white">
+            {msg.message}
+          </Text>
+        </div>
+      ))}
     </div>
   );
 }
 
-export function StreamPlayer({ isHost = false }) {
+function RightRail() {
   const [_, copy] = useCopyToClipboard();
+  const { name: roomName } = useRoomContext();
 
+  const share = () => {
+    const url = `${process.env.NEXT_PUBLIC_SITE_URL}/watch/${roomName}`;
+    if (typeof navigator !== "undefined" && (navigator as any).share) {
+      void (navigator as any).share({ title: "HITS LAB Live", url });
+    } else {
+      copy(url);
+    }
+  };
+
+  return (
+    <div className="absolute right-3 bottom-28 z-20 flex flex-col items-center gap-5">
+      <Flex direction="column" align="center" gap="1">
+        <button
+          onClick={share}
+          className="h-11 w-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center text-xl"
+        >
+          🔗
+        </button>
+        <Text size="1" className="text-white">
+          Compartir
+        </Text>
+      </Flex>
+      <Flex direction="column" align="center" gap="1">
+        <div className="h-11 w-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center text-xl opacity-70">
+          🛍️
+        </div>
+        <Text size="1" className="text-white opacity-70">
+          Tienda
+        </Text>
+      </Flex>
+    </div>
+  );
+}
+
+function BottomBar({ isHost }: { isHost: boolean }) {
+  const [draft, setDraft] = useState("");
+  const { send: sendChat } = useChat();
+  const { send: sendReaction } = useDataChannel("reactions");
+  const { metadata } = useRoomInfo();
+  const [encoder] = useState(() => new TextEncoder());
+
+  const { enable_chat: chatEnabled } = (
+    metadata ? JSON.parse(metadata) : {}
+  ) as RoomMetadata;
+
+  const onSend = async () => {
+    if (draft.trim().length && sendChat) {
+      setDraft("");
+      await sendChat(draft);
+    }
+  };
+
+  const react = (emoji: string) => {
+    if (sendReaction) {
+      sendReaction(encoder.encode(emoji), { kind: DataPacket_Kind.LOSSY });
+    }
+    if (sendChat) {
+      void sendChat(emoji);
+    }
+  };
+
+  return (
+    <Flex direction="column" gap="2">
+      {isHost && (
+        <Flex gap="2" align="center" wrap="wrap">
+          <MediaDeviceSettings />
+        </Flex>
+      )}
+      <Flex gap="2" align="center">
+        <Box className="flex-1">
+          <TextField.Input
+            radius="full"
+            disabled={!chatEnabled}
+            placeholder={chatEnabled ? "Escribe algo..." : "Chat desactivado"}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyUp={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onSend();
+              }
+            }}
+          />
+        </Box>
+        <IconButton
+          radius="full"
+          onClick={onSend}
+          disabled={!draft.trim().length}
+        >
+          <PaperPlaneIcon />
+        </IconButton>
+        {!isHost && (
+          <>
+            <IconButton
+              radius="full"
+              variant="soft"
+              onClick={() => react("❤️")}
+            >
+              ❤️
+            </IconButton>
+            <IconButton
+              radius="full"
+              variant="soft"
+              onClick={() => react("🔥")}
+            >
+              🔥
+            </IconButton>
+          </>
+        )}
+      </Flex>
+    </Flex>
+  );
+}
+
+export function StreamPlayer({ isHost = false }) {
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack>();
   const localVideoEl = useRef<HTMLVideoElement>(null);
 
-  const { metadata, name: roomName, state: roomState } = useRoomContext();
-  const roomMetadata = (metadata && JSON.parse(metadata)) as RoomMetadata;
+  const { name: roomName, state: roomState } = useRoomContext();
   const { localParticipant } = useLocalParticipant();
   const localMetadata = (localParticipant.metadata &&
     JSON.parse(localParticipant.metadata)) as ParticipantMetadata;
@@ -161,30 +269,12 @@ export function StreamPlayer({ isHost = false }) {
     (t) => t.participant.identity !== localParticipant.identity
   );
 
-  const authToken = useAuthToken();
-  const onLeaveStage = async () => {
-    await fetch("/api/remove_from_stage", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Token ${authToken}`,
-      },
-      body: JSON.stringify({
-        identity: localParticipant.identity,
-      }),
-    });
-  };
-
   return (
-    <div className="relative h-full w-full bg-black">
-      <Grid className="w-full h-full absolute" gap="2">
+    <div className="relative h-full w-full overflow-hidden bg-black">
+      <Grid className="absolute inset-0 w-full h-full">
         {canHost && (
           <div className="relative">
-            <Flex
-              className="absolute w-full h-full"
-              align="center"
-              justify="center"
-            >
+            <Flex className="absolute inset-0" align="center" justify="center">
               <Avatar
                 size="9"
                 fallback={localParticipant.identity[0] ?? "?"}
@@ -193,17 +283,13 @@ export function StreamPlayer({ isHost = false }) {
             </Flex>
             <video
               ref={localVideoEl}
-              className="absolute w-full h-full object-contain -scale-x-100 bg-transparent"
+              className="absolute inset-0 w-full h-full object-cover -scale-x-100 bg-transparent"
             />
           </div>
         )}
         {remoteVideoTracks.map((t) => (
           <div key={t.participant.identity} className="relative">
-            <Flex
-              className="absolute w-full h-full"
-              align="center"
-              justify="center"
-            >
+            <Flex className="absolute inset-0" align="center" justify="center">
               <Avatar
                 size="9"
                 fallback={t.participant.identity[0] ?? "?"}
@@ -212,92 +298,80 @@ export function StreamPlayer({ isHost = false }) {
             </Flex>
             <VideoTrack
               trackRef={t}
-              className="absolute w-full h-full bg-transparent"
+              className="absolute inset-0 w-full h-full object-cover bg-transparent"
             />
           </div>
         ))}
       </Grid>
+
       {remoteAudioTracks.map((t) => (
         <AudioTrack trackRef={t} key={t.participant.identity} />
       ))}
+
       <ConfettiCanvas />
       <StartAudio
-        label="Click to allow audio playback"
-        className="absolute top-0 h-full w-full bg-gray-2-translucent text-white"
+        label="Toca para activar el audio"
+        className="absolute inset-0 w-full h-full bg-gray-2-translucent text-white z-40"
       />
-      <div className="absolute top-0 w-full p-2">
-        <Flex justify="between" align="end">
-          <Flex gap="2" justify="center" align="center">
+
+      <div className="pointer-events-none absolute top-0 inset-x-0 h-28 z-10 bg-gradient-to-b from-black/60 to-transparent" />
+      <div className="pointer-events-none absolute bottom-0 inset-x-0 h-44 z-10 bg-gradient-to-t from-black/70 to-transparent" />
+
+      <div className="absolute top-0 inset-x-0 p-3 z-30">
+        <Flex justify="between" align="center" gap="2">
+          <Flex align="center" gap="2">
             <img
               src="/hitslab-logo.png"
               alt="HITS LAB"
-              className="h-8 w-auto mr-1 pointer-events-none select-none"
+              className="h-9 w-auto pointer-events-none select-none drop-shadow"
             />
-            <Button
-              size="1"
-              variant="soft"
-              disabled={!Boolean(roomName)}
-              onClick={() =>
-                copy(`${process.env.NEXT_PUBLIC_SITE_URL}/watch/${roomName}`)
-              }
-            >
-              {roomState === ConnectionState.Connected ? (
-                <>
-                  {roomName} <CopyIcon />
-                </>
-              ) : (
-                "Loading..."
-              )}
-            </Button>
-            {roomName && canHost && (
-              <Flex gap="2">
-                <MediaDeviceSettings />
-                {roomMetadata?.creator_identity !==
-                  localParticipant.identity && (
-                  <Button size="1" onClick={onLeaveStage}>
-                    Leave stage
-                  </Button>
-                )}
-              </Flex>
-            )}
-          </Flex>
-          <Flex gap="2">
             {roomState === ConnectionState.Connected && (
-              <Flex gap="1" align="center">
-                <div className="rounded-6 bg-red-9 w-2 h-2 animate-pulse" />
-                <Text size="1" className="uppercase text-accent-11">
+              <Flex
+                align="center"
+                gap="1"
+                className="rounded-full bg-black/40 backdrop-blur px-2 py-1"
+              >
+                <div className="rounded-full bg-red-9 w-2 h-2 animate-pulse" />
+                <Text size="1" weight="bold" className="uppercase text-white">
                   Live
                 </Text>
               </Flex>
             )}
-            <PresenceDialog isHost={isHost}>
-              <div className="relative">
-                {showNotification && (
-                  <div className="absolute flex h-3 w-3 -top-1 -right-1">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-6 bg-accent-11 opacity-75"></span>
-                    <span className="relative inline-flex rounded-6 h-3 w-3 bg-accent-11"></span>
-                  </div>
-                )}
-                <Button
-                  size="1"
-                  variant="soft"
-                  disabled={roomState !== ConnectionState.Connected}
-                >
-                  {roomState === ConnectionState.Connected ? (
-                    <EyeOpenIcon />
-                  ) : (
-                    <EyeClosedIcon />
-                  )}
-                  {roomState === ConnectionState.Connected
-                    ? participants.length
-                    : ""}
-                </Button>
-              </div>
-            </PresenceDialog>
           </Flex>
+          <PresenceDialog isHost={isHost}>
+            <div className="relative">
+              {showNotification && (
+                <div className="absolute flex h-3 w-3 -top-1 -right-1">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-11 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-accent-11"></span>
+                </div>
+              )}
+              <Button
+                size="1"
+                variant="soft"
+                radius="full"
+                disabled={roomState !== ConnectionState.Connected}
+              >
+                {roomState === ConnectionState.Connected ? (
+                  <EyeOpenIcon />
+                ) : (
+                  <EyeClosedIcon />
+                )}
+                {roomState === ConnectionState.Connected
+                  ? participants.length
+                  : ""}
+              </Button>
+            </div>
+          </PresenceDialog>
         </Flex>
       </div>
-      <MobileChatOverlay />
+
+      <ChatOverlay />
+      {!isHost && <RightRail />}
+
+      <div className="absolute bottom-0 inset-x-0 p-3 z-30">
+        <BottomBar isHost={isHost} />
+      </div>
     </div>
   );
 }
