@@ -4,15 +4,17 @@ import {
   AudioTrack,
   StartAudio,
   VideoTrack,
+  useChat,
   useDataChannel,
   useLocalParticipant,
   useMediaDeviceSelect,
   useParticipants,
   useRoomContext,
+  useRoomInfo,
   useTracks,
 } from "@livekit/components-react";
 import { CopyIcon, EyeClosedIcon, EyeOpenIcon } from "@radix-ui/react-icons";
-import { Avatar, Badge, Button, Flex, Grid, Text } from "@radix-ui/themes";
+import { Avatar, Button, Flex, Grid, Text, TextField } from "@radix-ui/themes";
 import Confetti from "js-confetti";
 import {
   ConnectionState,
@@ -20,7 +22,7 @@ import {
   Track,
   createLocalTracks,
 } from "livekit-client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MediaDeviceSettings } from "./media-device-settings";
 import { PresenceDialog } from "./presence-dialog";
 import { useAuthToken } from "./token-context";
@@ -45,6 +47,64 @@ function ConfettiCanvas() {
   }, []);
 
   return <canvas ref={canvasEl} className="absolute h-full w-full" />;
+}
+
+function MobileChatOverlay() {
+  const [draft, setDraft] = useState("");
+  const { chatMessages, send } = useChat();
+  const { metadata } = useRoomInfo();
+  const { enable_chat: chatEnabled } = (
+    metadata ? JSON.parse(metadata) : {}
+  ) as RoomMetadata;
+
+  const recent = useMemo(() => {
+    const seen = new Set<number>();
+    const unique = chatMessages.filter((m) => {
+      if (seen.has(m.timestamp)) return false;
+      seen.add(m.timestamp);
+      return true;
+    });
+    return unique.slice(-6);
+  }, [chatMessages]);
+
+  const onSend = async () => {
+    if (draft.trim().length && send) {
+      setDraft("");
+      await send(draft);
+    }
+  };
+
+  return (
+    <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col gap-2 p-2 sm:hidden">
+      <div className="flex flex-col items-start gap-1 pointer-events-none">
+        {recent.map((msg) => (
+          <div
+            key={msg.timestamp}
+            className="max-w-[85%] rounded-full bg-black/60 backdrop-blur-sm px-3 py-1"
+          >
+            <Text size="1" weight="bold" className="text-accent-11 mr-1">
+              {msg.from?.identity ?? "?"}
+            </Text>
+            <Text size="1" className="text-white">
+              {msg.message}
+            </Text>
+          </div>
+        ))}
+      </div>
+      <TextField.Input
+        disabled={!chatEnabled}
+        placeholder={chatEnabled ? "Escribe algo..." : "Chat desactivado"}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyUp={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onSend();
+          }
+        }}
+      />
+    </div>
+  );
 }
 
 export function StreamPlayer({ isHost = false }) {
@@ -135,15 +195,6 @@ export function StreamPlayer({ isHost = false }) {
               ref={localVideoEl}
               className="absolute w-full h-full object-contain -scale-x-100 bg-transparent"
             />
-            <div className="absolute w-full h-full">
-              <Badge
-                variant="outline"
-                color="gray"
-                className="absolute bottom-2 right-2"
-              >
-                {localParticipant.identity} (you)
-              </Badge>
-            </div>
           </div>
         )}
         {remoteVideoTracks.map((t) => (
@@ -163,15 +214,6 @@ export function StreamPlayer({ isHost = false }) {
               trackRef={t}
               className="absolute w-full h-full bg-transparent"
             />
-            <div className="absolute w-full h-full">
-              <Badge
-                variant="outline"
-                color="gray"
-                className="absolute bottom-2 right-2"
-              >
-                {t.participant.identity}
-              </Badge>
-            </div>
           </div>
         ))}
       </Grid>
@@ -255,6 +297,7 @@ export function StreamPlayer({ isHost = false }) {
           </Flex>
         </Flex>
       </div>
+      <MobileChatOverlay />
     </div>
   );
 }
