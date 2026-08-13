@@ -1,8 +1,5 @@
 "use client";
 
-import { Chat } from "@/components/chat";
-import { ReactionBar } from "@/components/reaction-bar";
-import { Spinner } from "@/components/spinner";
 import { StreamPlayer } from "@/components/stream-player";
 import { TokenContext } from "@/components/token-context";
 import { JoinStreamResponse } from "@/lib/controller";
@@ -11,7 +8,6 @@ import { LiveKitRoom } from "@livekit/components-react";
 import { ArrowRightIcon, PersonIcon } from "@radix-ui/react-icons";
 import {
   Avatar,
-  Box,
   Button,
   Card,
   Flex,
@@ -20,6 +16,7 @@ import {
   TextField,
 } from "@radix-ui/themes";
 import { useState } from "react";
+import { Spinner } from "@/components/spinner";
 
 export default function WatchPage({
   roomName,
@@ -54,14 +51,28 @@ export default function WatchPage({
 
   if (!authToken || !roomToken) {
     return (
-      <Flex align="center" justify="center" className="min-h-screen">
-        <Card className="p-3 w-[380px]">
-          <Heading size="4" className="mb-4">
-            Entering {decodeURI(roomName)}
+      <Flex
+        align="center"
+        justify="center"
+        className="min-h-[100dvh] p-4 bg-black"
+      >
+        <Card className="p-4 w-full max-w-[380px]">
+          <Flex justify="center" mb="4">
+            <img
+              src="/hitslab-logo.png"
+              alt="HITS LAB"
+              className="h-14 w-auto"
+            />
+          </Flex>
+          <Heading size="4" align="center" className="mb-1">
+            {decodeURI(roomName)}
           </Heading>
+          <Text as="div" size="2" align="center" className="mb-4 text-gray-11">
+            Entra al en vivo
+          </Text>
           <label>
             <Text as="div" size="2" mb="1" weight="bold">
-              Your name
+              Tu nombre
             </Text>
             <TextField.Root>
               <TextField.Slot>
@@ -72,23 +83,28 @@ export default function WatchPage({
                 />
               </TextField.Slot>
               <TextField.Input
-                placeholder="Roger Dunn"
+                placeholder="Escribe tu nombre"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </TextField.Root>
           </label>
-          <Flex gap="3" mt="6" justify="end">
-            <Button disabled={!name || loading} onClick={onJoin}>
+          <Flex mt="5" justify="center">
+            <Button
+              size="3"
+              disabled={!name || loading}
+              onClick={onJoin}
+              className="w-full"
+            >
               {loading ? (
                 <Flex gap="2" align="center">
                   <Spinner />
-                  <Text>Joining...</Text>
+                  <Text>Entrando...</Text>
                 </Flex>
               ) : (
                 <>
-                  Join as viewer{" "}
+                  Entrar al en vivo{" "}
                   <ArrowRightIcon className={cn(name && "animate-wiggle")} />
                 </>
               )}
@@ -102,17 +118,9 @@ export default function WatchPage({
   return (
     <TokenContext.Provider value={authToken}>
       <LiveKitRoom serverUrl={serverUrl} token={roomToken}>
-        <Flex className="w-full h-screen">
-          <Flex direction="column" className="flex-1">
-            <Box className="flex-1 bg-gray-1">
-              <StreamPlayer />
-            </Box>
-            <ReactionBar />
-          </Flex>
-          <Box className="bg-accent-2 min-w-[280px] border-l border-accent-5 hidden sm:block">
-            <Chat />
-          </Box>
-        </Flex>
+        <div className="w-full h-[100dvh] bg-black">
+          <StreamPlayer />
+        </div>
       </LiveKitRoom>
     </TokenContext.Provider>
   );
