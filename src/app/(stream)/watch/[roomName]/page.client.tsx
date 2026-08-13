@@ -109,7 +109,7 @@ export default function WatchPage({
             </Box>
             <ReactionBar />
           </Flex>
-          <Box className="bg-accent-2 min-w-[280px] border-l border-accent-5">
+          <Box className="bg-accent-2 min-w-[280px] border-l border-accent-5 hidden sm:block">
             <Chat />
           </Box>
         </Flex>
