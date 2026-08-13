@@ -68,46 +68,114 @@ function ConfettiCanvas() {
 const CHAT_LIFETIME = 10000;
 const CHAT_FADE = 2000;
 
+type FeedItem = {
+  key: string;
+  kind: "chat" | "join";
+  name: string;
+  text: string;
+  timestamp: number;
+};
+
 function ChatOverlay() {
   const { chatMessages } = useChat();
+  const participants = useParticipants();
   const [now, setNow] = useState(() => Date.now());
+  const [joins, setJoins] = useState<
+    { id: string; identity: string; timestamp: number }[]
+  >([]);
+  const seen = useRef<Set<string>>(new Set());
+  const inited = useRef(false);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(id);
   }, []);
 
-  const recent = useMemo(() => {
-    const seen = new Set<number>();
-    const unique = chatMessages.filter((m) => {
-      if (seen.has(m.timestamp)) return false;
-      seen.add(m.timestamp);
-      return true;
-    });
-    return unique
-      .filter((m) => now - m.timestamp < CHAT_LIFETIME)
-      .slice(-6);
-  }, [chatMessages, now]);
+  useEffect(() => {
+    const ids = participants.map((p) => p.identity).filter(Boolean);
+    if (!inited.current) {
+      ids.forEach((i) => seen.current.add(i));
+      inited.current = true;
+      return;
+    }
+    const fresh = ids.filter((i) => !seen.current.has(i));
+    if (fresh.length) {
+      fresh.forEach((i) => seen.current.add(i));
+      const ts = Date.now();
+      setJoins((prev) => [
+        ...prev,
+        ...fresh.map((i, idx) => ({
+          id: `${i}-${ts}-${idx}`,
+          identity: i,
+          timestamp: ts,
+        })),
+      ]);
+    }
+  }, [participants]);
+
+  const feed = useMemo<FeedItem[]>(() => {
+    const seenTs = new Set<number>();
+    const chat: FeedItem[] = chatMessages
+      .filter((m) => {
+        if (seenTs.has(m.timestamp)) return false;
+        seenTs.add(m.timestamp);
+        return true;
+      })
+      .map((m) => ({
+        key: `c-${m.timestamp}`,
+        kind: "chat",
+        name: m.from?.identity ?? "?",
+        text: m.message,
+        timestamp: m.timestamp,
+      }));
+    const joinItems: FeedItem[] = joins.map((j) => ({
+      key: `j-${j.id}`,
+      kind: "join",
+      name: j.identity,
+      text: "",
+      timestamp: j.timestamp,
+    }));
+    return [...chat, ...joinItems]
+      .filter((it) => now - it.timestamp < CHAT_LIFETIME)
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(-7);
+  }, [chatMessages, joins, now]);
 
   return (
     <div className="absolute left-3 right-20 bottom-28 z-20 flex flex-col items-start gap-1.5 pointer-events-none">
-      {recent.map((msg) => {
-        const age = now - msg.timestamp;
+      {feed.map((it) => {
+        const age = now - it.timestamp;
         const opacity =
           age > CHAT_LIFETIME - CHAT_FADE
             ? Math.max(0, (CHAT_LIFETIME - age) / CHAT_FADE)
             : 1;
+        if (it.kind === "join") {
+          return (
+            <div
+              key={it.key}
+              style={{ opacity }}
+              className="rounded-2xl bg-black/45 backdrop-blur-sm px-3 py-1 transition-opacity duration-500"
+            >
+              <Text size="1" weight="bold" className="text-accent-11 mr-1">
+                {it.name}
+              </Text>
+              <Text size="1" className="text-white/80">
+                se unió 👋
+              </Text>
+            </div>
+          );
+        }
         return (
           <div
-            key={msg.timestamp}
+            key={it.key}
             style={{ opacity }}
             className="max-w-full rounded-2xl bg-black/55 backdrop-blur-sm px-3 py-1.5 transition-opacity duration-500"
           >
             <Text size="1" weight="bold" className="text-accent-11 mr-1">
-              {msg.from?.identity ?? "?"}
+              {it.name}
             </Text>
             <Text size="1" className="text-white">
-              {msg.message}
+              {it.text}
             </Text>
           </div>
         );
@@ -140,6 +208,14 @@ function RightRail() {
         </button>
         <Text size="1" className="text-white">
           Compartir
+        </Text>
+      </Flex>
+      <Flex direction="column" align="center" gap="1">
+        <div className="h-11 w-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center text-xl">
+          💳
+        </div>
+        <Text size="1" className="text-white">
+          Wallet
         </Text>
       </Flex>
       <Flex direction="column" align="center" gap="1">
@@ -334,6 +410,7 @@ function BottomBar({ isHost }: { isHost: boolean }) {
 }
 
 export function StreamPlayer({ isHost = false }) {
+  const [following, setFollowing] = useState(false);
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack>();
   const localVideoEl = useRef<HTMLVideoElement>(null);
 
@@ -459,6 +536,19 @@ export function StreamPlayer({ isHost = false }) {
                   Live
                 </Text>
               </Flex>
+            )}
+            {!isHost && (
+              <button
+                onClick={() => setFollowing((f) => !f)}
+                className={
+                  "rounded-full px-3 py-1 text-xs font-bold " +
+                  (following
+                    ? "bg-black/40 text-white backdrop-blur"
+                    : "bg-accent-9 text-black")
+                }
+              >
+                {following ? "Siguiendo" : "Seguir"}
+              </button>
             )}
           </Flex>
           <PresenceDialog isHost={isHost}>
