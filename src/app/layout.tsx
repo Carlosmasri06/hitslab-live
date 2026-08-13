@@ -2,13 +2,13 @@ import "@/styles/globals.css";
 
 import { Theme, ThemePanel } from "@radix-ui/themes";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Sora } from "next/font/google";
 
-const inter = Inter({ subsets: ["latin"] });
+const sora = Sora({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Livestream with LiveKit",
-  description: "A sample full-stack application built with LiveKit",
+  title: "HITS LAB — Live",
+  description: "Compra en vivo de HITS LAB TCG",
 };
 
 export default function RootLayout({
@@ -17,13 +17,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-     <Theme
+    <html lang="es" suppressHydrationWarning>
+      <body className={sora.className}>
+        <Theme
           appearance="dark"
           accentColor="amber"
           grayColor="sand"
-          radius="none"
+          radius="large"
         >
           {children}
           <ThemePanel defaultOpen={false} />
