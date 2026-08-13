@@ -186,6 +186,11 @@ export function StreamPlayer({ isHost = false }) {
       <div className="absolute top-0 w-full p-2">
         <Flex justify="between" align="end">
           <Flex gap="2" justify="center" align="center">
+            <img
+              src="/hitslab-logo.png"
+              alt="HITS LAB"
+              className="h-8 w-auto mr-1 pointer-events-none select-none"
+            />
             <Button
               size="1"
               variant="soft"
