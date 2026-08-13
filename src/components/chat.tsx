@@ -75,7 +75,7 @@ export function Chat() {
   return (
     <Flex direction="column" className="h-full">
       <Box className="text-center p-2 border-b border-accent-5">
-        <Text size="2" className="font-mono text-accent-11">
+        <Text size="2" weight="bold" className="text-accent-11 tracking-wide">
           Live Chat
         </Text>
       </Box>
