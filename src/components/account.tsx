@@ -72,13 +72,19 @@ function AuthStep({ onDone }: { onDone: () => void }) {
   const submit = async () => {
     setBusy(true);
     setErr("");
-    const { error } =
+    const { data, error } =
       mode === "signup"
         ? await supabase.auth.signUp({ email, password: pw })
         : await supabase.auth.signInWithPassword({ email, password: pw });
     setBusy(false);
     if (error) {
       setErr(error.message);
+      return;
+    }
+    if (!data.session) {
+      setErr(
+        "Cuenta creada. Revisa tu correo para confirmarla y vuelve a entrar."
+      );
       return;
     }
     onDone();
