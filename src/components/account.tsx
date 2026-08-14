@@ -10,6 +10,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import type { User } from "@supabase/supabase-js";
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useState } from "react";
 
 const stripePromise = loadStripe(
@@ -346,8 +347,9 @@ export function AccountGate({
     : "done";
 
   if (!open) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 overflow-y-auto"
       style={{
@@ -406,6 +408,7 @@ export function AccountGate({
           </button>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
