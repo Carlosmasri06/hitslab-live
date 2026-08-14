@@ -70,6 +70,87 @@ function useCountdown(endsAt?: string | null) {
   return left;
 }
 
+function SlideToBid({
+  label,
+  onConfirm,
+  disabled,
+  locked,
+  onLocked,
+}: {
+  label: string;
+  onConfirm: () => void;
+  disabled?: boolean;
+  locked?: boolean;
+  onLocked?: () => void;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [x, setX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const HANDLE = 52;
+
+  const maxX = () => Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE);
+
+  const onDown = (e: React.PointerEvent) => {
+    if (locked) {
+      onLocked?.();
+      return;
+    }
+    if (disabled) return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setDragging(true);
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (!dragging || !trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    const nx = Math.max(0, Math.min(maxX(), e.clientX - rect.left - HANDLE / 2));
+    setX(nx);
+  };
+  const finish = () => {
+    if (!dragging) return;
+    setDragging(false);
+    const reached = x >= maxX() * 0.9 && maxX() > 0;
+    setX(0);
+    if (reached) onConfirm();
+  };
+
+  return (
+    <div
+      ref={trackRef}
+      style={{ touchAction: "none" }}
+      className={
+        "relative h-[52px] rounded-full overflow-hidden select-none " +
+        (locked ? "bg-white/10" : "bg-white/15")
+      }
+    >
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-14">
+        <Text size="2" weight="bold" className="text-white/90 truncate">
+          {label}
+        </Text>
+      </div>
+      <div
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={finish}
+        onPointerCancel={finish}
+        style={{
+          width: HANDLE,
+          height: HANDLE,
+          transform: `translateX(${x}px)`,
+          touchAction: "none",
+        }}
+        className={
+          "absolute left-0 top-0 rounded-full flex items-center justify-center text-xl font-bold " +
+          (locked ? "bg-gray-7 text-gray-11 " : "bg-accent-9 text-black ") +
+          (disabled ? "opacity-50 " : "") +
+          (dragging ? "" : "transition-transform")
+        }
+      >
+        →
+      </div>
+    </div>
+  );
+}
+
 function StartAuctionDialog({
   roomName,
   onStarted,
@@ -226,88 +307,6 @@ function StartAuctionDialog({
   );
 }
 
-function SlideToBid({
-  label,
-  onConfirm,
-  disabled,
-  locked,
-  onLocked,
-}: {
-  label: string;
-  onConfirm: () => void;
-  disabled?: boolean;
-  locked?: boolean;
-  onLocked?: () => void;
-}) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [x, setX] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const HANDLE = 52;
-
-  const maxX = () =>
-    Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE);
-
-  const onDown = (e: React.PointerEvent) => {
-    if (locked) {
-      onLocked?.();
-      return;
-    }
-    if (disabled) return;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    setDragging(true);
-  };
-  const onMove = (e: React.PointerEvent) => {
-    if (!dragging || !trackRef.current) return;
-    const rect = trackRef.current.getBoundingClientRect();
-    const nx = Math.max(0, Math.min(maxX(), e.clientX - rect.left - HANDLE / 2));
-    setX(nx);
-  };
-  const finish = () => {
-    if (!dragging) return;
-    setDragging(false);
-    const reached = x >= maxX() * 0.9 && maxX() > 0;
-    setX(0);
-    if (reached) onConfirm();
-  };
-
-  return (
-    <div
-      ref={trackRef}
-      style={{ touchAction: "none" }}
-      className={
-        "relative h-[52px] rounded-full overflow-hidden select-none " +
-        (locked ? "bg-white/10" : "bg-white/15")
-      }
-    >
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-14">
-        <Text size="2" weight="bold" className="text-white/90 truncate">
-          {label}
-        </Text>
-      </div>
-      <div
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={finish}
-        onPointerCancel={finish}
-        style={{
-          width: HANDLE,
-          height: HANDLE,
-          transform: `translateX(${x}px)`,
-          touchAction: "none",
-        }}
-        className={
-          "absolute left-0 top-0 rounded-full flex items-center justify-center text-xl font-bold " +
-          (locked ? "bg-gray-7 text-gray-11 " : "bg-accent-9 text-black ") +
-          (disabled ? "opacity-50 " : "") +
-          (dragging ? "" : "transition-transform")
-        }
-      >
-        →
-      </div>
-    </div>
-  );
-}
-
 export function AuctionBar({ isHost }: { isHost: boolean }) {
   const { name: roomName } = useRoomContext();
   const { localParticipant } = useLocalParticipant();
@@ -352,8 +351,20 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
     }
   };
 
+  const gate = !isHost ? (
+    <AccountGate
+      open={gateOpen}
+      onOpenChange={setGateOpen}
+      user={user}
+      bidder={bidder}
+      refresh={refresh}
+    />
+  ) : null;
+
+  let content: React.ReactNode = null;
+
   if (live) {
-    return (
+    content = (
       <div className="pointer-events-auto mb-2 rounded-2xl bg-black/70 backdrop-blur px-3 py-2">
         <Flex align="center" gap="2">
           {auction!.image_url && (
@@ -401,13 +412,6 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
               locked={!canBid}
               onLocked={() => setGateOpen(true)}
             />
-            <AccountGate
-              open={gateOpen}
-              onOpenChange={setGateOpen}
-              user={user}
-              bidder={bidder}
-              refresh={refresh}
-            />
           </div>
         )}
         {err && (
@@ -417,10 +421,8 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
         )}
       </div>
     );
-  }
-
-  if (ended && auction!.current_bidder_name) {
-    return (
+  } else if (ended && auction!.current_bidder_name) {
+    content = (
       <div className="pointer-events-auto mb-2 rounded-2xl bg-black/70 backdrop-blur px-3 py-2">
         <Flex align="center" gap="2">
           {auction!.image_url && (
@@ -447,15 +449,18 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
         )}
       </div>
     );
-  }
-
-  if (isHost && roomName) {
-    return (
+  } else if (isHost && roomName) {
+    content = (
       <div className="pointer-events-auto mb-2">
         <StartAuctionDialog roomName={roomName} onStarted={reload} />
       </div>
     );
   }
 
-  return null;
+  return (
+    <>
+      {gate}
+      {content}
+    </>
+  );
 }
