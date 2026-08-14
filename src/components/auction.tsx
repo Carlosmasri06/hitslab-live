@@ -5,6 +5,14 @@ import { useLocalParticipant, useRoomContext } from "@livekit/components-react";
 import { Button, Dialog, Flex, Text, TextField } from "@radix-ui/themes";
 import { useCallback, useEffect, useState } from "react";
 
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  images: string[] | null;
+  stock: number;
+};
+
 function useAuction(roomName?: string) {
   const [auction, setAuction] = useState<Auction | null>(null);
 
@@ -69,26 +77,50 @@ function StartAuctionDialog({
   onStarted: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Product | null>(null);
   const [price, setPrice] = useState("");
   const [increment, setIncrement] = useState("10");
   const [duration, setDuration] = useState("30");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    supabase
+      .from("products")
+      .select("id,name,price,images,stock")
+      .eq("active", true)
+      .order("featured", { ascending: false })
+      .order("name")
+      .limit(300)
+      .then(({ data }) => setProducts((data as Product[]) || []));
+  }, [open]);
+
+  const filtered = products.filter((p) =>
+    p.name.toLowerCase().includes(q.toLowerCase())
+  );
+
+  const pick = (p: Product) => {
+    setSelected(p);
+    setPrice(p.price != null ? String(p.price) : "");
+  };
+
   const start = async () => {
+    if (!selected) return;
     setBusy(true);
     await supabase.rpc("create_auction", {
       p_room: roomName,
-      p_title: title || "Artículo",
-      p_image_url: null,
+      p_title: selected.name.trim(),
+      p_image_url: selected.images?.[0] ?? null,
       p_start_price: Number(price) || 0,
       p_increment: Number(increment) || 10,
       p_duration_seconds: Number(duration) || 30,
     });
     setBusy(false);
     setOpen(false);
-    setTitle("");
-    setPrice("");
+    setSelected(null);
+    setQ("");
     onStarted();
   };
 
@@ -99,63 +131,95 @@ function StartAuctionDialog({
           ➕ Subastar artículo
         </Button>
       </Dialog.Trigger>
-      <Dialog.Content style={{ maxWidth: 400 }}>
-        <Dialog.Title>Nueva subasta</Dialog.Title>
-        <Flex direction="column" gap="3" mt="2">
-          <label>
-            <Text as="div" size="1" weight="bold" mb="1">
-              Artículo
+      <Dialog.Content style={{ maxWidth: 460 }}>
+        <Dialog.Title>Subastar artículo</Dialog.Title>
+        <TextField.Input
+          style={{ fontSize: 16 }}
+          placeholder="Buscar en tu tienda..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <div
+          style={{ maxHeight: 260, overflowY: "auto" }}
+          className="mt-2 flex flex-col gap-1"
+        >
+          {filtered.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => pick(p)}
+              className={
+                "flex items-center gap-2 rounded-lg p-2 text-left transition-colors " +
+                (selected?.id === p.id ? "bg-accent-4" : "hover:bg-gray-3")
+              }
+            >
+              <img
+                src={p.images?.[0] || ""}
+                alt=""
+                className="h-10 w-10 rounded object-cover bg-gray-4 shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm truncate">{p.name}</div>
+                <div className="text-xs text-gray-11">
+                  ${Number(p.price).toLocaleString()} · stock {p.stock}
+                </div>
+              </div>
+            </button>
+          ))}
+          {filtered.length === 0 && (
+            <Text size="1" className="text-gray-11 p-2">
+              Sin resultados
             </Text>
-            <TextField.Input
-              style={{ fontSize: 16 }}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ej. Pikachu VMAX PSA 10"
-            />
-          </label>
-          <Flex gap="3">
-            <label style={{ flex: 1 }}>
-              <Text as="div" size="1" weight="bold" mb="1">
-                Precio inicial
-              </Text>
-              <TextField.Input
-                style={{ fontSize: 16 }}
-                type="number"
-                inputMode="decimal"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0"
-              />
-            </label>
-            <label style={{ flex: 1 }}>
-              <Text as="div" size="1" weight="bold" mb="1">
-                Incremento
-              </Text>
-              <TextField.Input
-                style={{ fontSize: 16 }}
-                type="number"
-                inputMode="decimal"
-                value={increment}
-                onChange={(e) => setIncrement(e.target.value)}
-              />
-            </label>
+          )}
+        </div>
+
+        {selected && (
+          <Flex direction="column" gap="2" mt="3">
+            <Text size="1" weight="bold">
+              Subastando: {selected.name}
+            </Text>
+            <Flex gap="2">
+              <label style={{ flex: 1 }}>
+                <Text as="div" size="1" mb="1">
+                  Precio inicial
+                </Text>
+                <TextField.Input
+                  style={{ fontSize: 16 }}
+                  type="number"
+                  inputMode="decimal"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                />
+              </label>
+              <label style={{ flex: 1 }}>
+                <Text as="div" size="1" mb="1">
+                  Incremento
+                </Text>
+                <TextField.Input
+                  style={{ fontSize: 16 }}
+                  type="number"
+                  inputMode="decimal"
+                  value={increment}
+                  onChange={(e) => setIncrement(e.target.value)}
+                />
+              </label>
+              <label style={{ flex: 1 }}>
+                <Text as="div" size="1" mb="1">
+                  Segundos
+                </Text>
+                <TextField.Input
+                  style={{ fontSize: 16 }}
+                  type="number"
+                  inputMode="numeric"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                />
+              </label>
+            </Flex>
+            <Button size="3" disabled={busy} onClick={start}>
+              {busy ? "Iniciando..." : "Iniciar subasta"}
+            </Button>
           </Flex>
-          <label>
-            <Text as="div" size="1" weight="bold" mb="1">
-              Duración (segundos)
-            </Text>
-            <TextField.Input
-              style={{ fontSize: 16 }}
-              type="number"
-              inputMode="numeric"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-            />
-          </label>
-          <Button size="3" disabled={busy || !title} onClick={start}>
-            {busy ? "Iniciando..." : "Iniciar subasta"}
-          </Button>
-        </Flex>
+        )}
       </Dialog.Content>
     </Dialog.Root>
   );
@@ -205,8 +269,15 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
   if (live) {
     return (
       <div className="pointer-events-auto mb-2 rounded-2xl bg-black/70 backdrop-blur px-3 py-2">
-        <Flex align="center" justify="between" gap="2">
-          <Flex direction="column" className="min-w-0">
+        <Flex align="center" gap="2">
+          {auction!.image_url && (
+            <img
+              src={auction!.image_url}
+              alt=""
+              className="h-12 w-12 rounded-lg object-cover shrink-0"
+            />
+          )}
+          <Flex direction="column" className="min-w-0 flex-1">
             <Text size="2" weight="bold" className="text-white truncate">
               {auction!.title}
             </Text>
@@ -216,7 +287,7 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
                 : "Sé el primero en pujar"}
             </Text>
           </Flex>
-          <Flex direction="column" align="end">
+          <Flex direction="column" align="end" className="shrink-0">
             <Text size="5" weight="bold" className="text-accent-11">
               ${Number(auction!.current_price).toLocaleString()}
             </Text>
@@ -252,13 +323,24 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
   if (ended && auction!.current_bidder_name) {
     return (
       <div className="pointer-events-auto mb-2 rounded-2xl bg-black/70 backdrop-blur px-3 py-2">
-        <Text size="2" weight="bold" className="text-white">
-          🔨 Vendido: {auction!.title}
-        </Text>
-        <Text as="div" size="1" className="text-accent-11">
-          a {auction!.current_bidder_name} por $
-          {Number(auction!.current_price).toLocaleString()}
-        </Text>
+        <Flex align="center" gap="2">
+          {auction!.image_url && (
+            <img
+              src={auction!.image_url}
+              alt=""
+              className="h-10 w-10 rounded-lg object-cover shrink-0"
+            />
+          )}
+          <div className="min-w-0">
+            <Text size="2" weight="bold" className="text-white truncate">
+              🔨 Vendido: {auction!.title}
+            </Text>
+            <Text as="div" size="1" className="text-accent-11">
+              a {auction!.current_bidder_name} por $
+              {Number(auction!.current_price).toLocaleString()}
+            </Text>
+          </div>
+        </Flex>
         {isHost && (
           <div className="mt-2">
             <StartAuctionDialog roomName={roomName!} onStarted={reload} />
