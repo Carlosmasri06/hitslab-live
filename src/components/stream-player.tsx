@@ -510,6 +510,27 @@ export function StreamPlayer({ isHost = false }) {
     cameraDevices.find((d) => d.deviceId === activeCameraDeviceId)?.label ?? "";
   const mirrorSelf = activeCamLabel.toLowerCase().includes("front");
 
+  const [remoteMirror, setRemoteMirror] = useState(false);
+  const { send: sendCam } = useDataChannel("cam", (msg) => {
+    setRemoteMirror(new TextDecoder().decode(msg.payload) === "front");
+  });
+  useEffect(() => {
+    if (!canHost) return;
+    const enc = new TextEncoder();
+    const publish = () => {
+      try {
+        sendCam?.(enc.encode(mirrorSelf ? "front" : "rear"), {
+          kind: DataPacket_Kind.RELIABLE,
+        });
+      } catch (e) {
+        // ignore
+      }
+    };
+    publish();
+    const id = setInterval(publish, 3000);
+    return () => clearInterval(id);
+  }, [canHost, mirrorSelf, sendCam]);
+
   const remoteVideoTracks = useTracks([Track.Source.Camera]).filter(
     (t) => t.participant.identity !== localParticipant.identity
   );
@@ -560,7 +581,10 @@ export function StreamPlayer({ isHost = false }) {
             </Flex>
             <VideoTrack
               trackRef={t}
-              className="absolute inset-0 w-full h-full object-cover bg-transparent"
+              className={
+                "absolute inset-0 w-full h-full object-cover bg-transparent " +
+                (remoteMirror ? "-scale-x-100" : "")
+              }
             />
           </div>
         ))}
