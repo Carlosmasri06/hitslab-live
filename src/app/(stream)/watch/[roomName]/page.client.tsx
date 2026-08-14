@@ -83,6 +83,7 @@ export default function WatchPage({
                 />
               </TextField.Slot>
               <TextField.Input
+                style={{ fontSize: 16 }}
                 placeholder="Escribe tu nombre"
                 type="text"
                 value={name}
