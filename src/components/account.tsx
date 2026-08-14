@@ -1,7 +1,7 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
-import { Button, Dialog, Flex, Text, TextField } from "@radix-ui/themes";
+import { Button, Flex, Heading, Text, TextField } from "@radix-ui/themes";
 import {
   Elements,
   PaymentElement,
@@ -85,12 +85,19 @@ function AuthStep({ onDone }: { onDone: () => void }) {
 
   return (
     <Flex direction="column" gap="3">
-      <Text size="2" className="text-gray-11">
-        {mode === "signup"
-          ? "Crea tu cuenta para pujar"
-          : "Inicia sesión para pujar"}
-      </Text>
+      <Flex direction="column" gap="2" className="mb-1">
+        <Text size="2" className="text-white/70">
+          ✓ Puja en vivo por cartas exclusivas
+        </Text>
+        <Text size="2" className="text-white/70">
+          ✓ Pago 100% seguro con Stripe
+        </Text>
+        <Text size="2" className="text-white/70">
+          ✓ Envío a domicilio en cuanto ganes
+        </Text>
+      </Flex>
       <TextField.Input
+        size="3"
         style={{ fontSize: 16 }}
         type="email"
         inputMode="email"
@@ -99,6 +106,7 @@ function AuthStep({ onDone }: { onDone: () => void }) {
         onChange={(e) => setEmail(e.target.value)}
       />
       <TextField.Input
+        size="3"
         style={{ fontSize: 16 }}
         type="password"
         placeholder="Contraseña (mín. 6)"
@@ -111,14 +119,14 @@ function AuthStep({ onDone }: { onDone: () => void }) {
         </Text>
       )}
       <Button
-        size="3"
+        size="4"
         disabled={busy || !email || pw.length < 6}
         onClick={submit}
       >
         {busy ? "..." : mode === "signup" ? "Crear cuenta" : "Iniciar sesión"}
       </Button>
       <button
-        className="text-xs text-accent-11 underline"
+        className="text-sm text-accent-11 underline"
         onClick={() => setMode(mode === "signup" ? "login" : "signup")}
       >
         {mode === "signup"
@@ -169,9 +177,12 @@ function CardInner({ onDone }: { onDone: () => void }) {
           {err}
         </Text>
       )}
-      <Button size="3" disabled={busy} onClick={submit}>
+      <Button size="4" disabled={busy} onClick={submit}>
         {busy ? "Guardando..." : "Guardar tarjeta"}
       </Button>
+      <Text size="1" className="text-white/50 text-center">
+        🔒 Tus datos van directo y cifrados a Stripe.
+      </Text>
     </Flex>
   );
 }
@@ -204,8 +215,8 @@ function CardStep({ onDone }: { onDone: () => void }) {
     );
   if (!clientSecret)
     return (
-      <Text size="2" className="text-gray-11">
-        Cargando...
+      <Text size="2" className="text-white/60">
+        Cargando pago seguro...
       </Text>
     );
 
@@ -262,28 +273,56 @@ function AddressStep({ onDone }: { onDone: () => void }) {
 
   return (
     <Flex direction="column" gap="2">
-      <Text size="2" className="text-gray-11">
-        ¿A dónde te lo enviamos si ganas?
-      </Text>
-      <TextField.Input style={S} placeholder="Nombre completo" value={f.ship_name} onChange={upd("ship_name")} />
-      <TextField.Input style={S} inputMode="tel" placeholder="Teléfono" value={f.ship_phone} onChange={upd("ship_phone")} />
-      <TextField.Input style={S} placeholder="Calle" value={f.ship_street} onChange={upd("ship_street")} />
+      <TextField.Input size="3" style={S} placeholder="Nombre completo" value={f.ship_name} onChange={upd("ship_name")} />
+      <TextField.Input size="3" style={S} inputMode="tel" placeholder="Teléfono" value={f.ship_phone} onChange={upd("ship_phone")} />
+      <TextField.Input size="3" style={S} placeholder="Calle" value={f.ship_street} onChange={upd("ship_street")} />
       <Flex gap="2">
-        <TextField.Input style={S} placeholder="No. ext" value={f.ship_ext} onChange={upd("ship_ext")} />
-        <TextField.Input style={S} placeholder="No. int (opc)" value={f.ship_int} onChange={upd("ship_int")} />
+        <TextField.Input size="3" style={S} placeholder="No. ext" value={f.ship_ext} onChange={upd("ship_ext")} />
+        <TextField.Input size="3" style={S} placeholder="No. int (opc)" value={f.ship_int} onChange={upd("ship_int")} />
       </Flex>
-      <TextField.Input style={S} placeholder="Colonia" value={f.ship_neighborhood} onChange={upd("ship_neighborhood")} />
+      <TextField.Input size="3" style={S} placeholder="Colonia" value={f.ship_neighborhood} onChange={upd("ship_neighborhood")} />
       <Flex gap="2">
-        <TextField.Input style={S} placeholder="Ciudad" value={f.ship_city} onChange={upd("ship_city")} />
-        <TextField.Input style={S} placeholder="Estado" value={f.ship_state} onChange={upd("ship_state")} />
+        <TextField.Input size="3" style={S} placeholder="Ciudad" value={f.ship_city} onChange={upd("ship_city")} />
+        <TextField.Input size="3" style={S} placeholder="Estado" value={f.ship_state} onChange={upd("ship_state")} />
       </Flex>
-      <TextField.Input style={S} inputMode="numeric" placeholder="Código postal" value={f.ship_zip} onChange={upd("ship_zip")} />
-      <Button size="3" disabled={busy || !ok} onClick={save}>
-        {busy ? "Guardando..." : "Guardar dirección"}
+      <TextField.Input size="3" style={S} inputMode="numeric" placeholder="Código postal" value={f.ship_zip} onChange={upd("ship_zip")} />
+      <Button size="4" disabled={busy || !ok} onClick={save}>
+        {busy ? "Guardando..." : "Guardar y empezar a pujar"}
       </Button>
     </Flex>
   );
 }
+
+function Steps({ step }: { step: string }) {
+  const order = ["auth", "card", "address"];
+  const idx = step === "done" ? 3 : order.indexOf(step);
+  return (
+    <Flex gap="2" justify="center" mt="4">
+      {order.map((_, i) => (
+        <div
+          key={i}
+          className={
+            "h-1.5 w-12 rounded-full " +
+            (i <= idx ? "bg-accent-9" : "bg-white/15")
+          }
+        />
+      ))}
+    </Flex>
+  );
+}
+
+const TITLES: Record<string, string> = {
+  auth: "Únete al remate",
+  card: "Agrega tu tarjeta",
+  address: "¿A dónde te lo enviamos?",
+  done: "¡Listo! 🔨",
+};
+const SUBS: Record<string, string> = {
+  auth: "Crea tu cuenta para pujar en vivo",
+  card: "Guárdala una vez, puja siempre",
+  address: "Tu dirección para cuando ganes",
+  done: "Ya puedes pujar en el en vivo",
+};
 
 export function AccountGate({
   open,
@@ -306,30 +345,67 @@ export function AccountGate({
     ? "address"
     : "done";
 
+  if (!open) return null;
+
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Content style={{ maxWidth: 420 }}>
-        <Dialog.Title>
-          {step === "auth"
-            ? "Cuenta"
-            : step === "card"
-            ? "Agrega tu tarjeta"
-            : step === "address"
-            ? "Dirección de envío"
-            : "¡Listo!"}
-        </Dialog.Title>
-        {step === "auth" && <AuthStep onDone={refresh} />}
-        {step === "card" && <CardStep onDone={refresh} />}
-        {step === "address" && <AddressStep onDone={refresh} />}
-        {step === "done" && (
-          <Flex direction="column" gap="3">
-            <Text size="2">✅ Cuenta lista. Ya puedes pujar.</Text>
-            <Button size="3" onClick={() => onOpenChange(false)}>
-              Empezar a pujar
-            </Button>
-          </Flex>
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto"
+      style={{
+        background:
+          "radial-gradient(130% 60% at 50% 0%, rgba(245,158,11,0.18), rgba(10,10,10,0) 55%), #0a0a0a",
+      }}
+    >
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-10 pt-5">
+        <button
+          onClick={() => onOpenChange(false)}
+          className="self-end text-2xl leading-none text-white/60"
+          aria-label="Cerrar"
+        >
+          ✕
+        </button>
+
+        <img
+          src="/hitslab-logo.png"
+          alt="HITS LAB"
+          className="mx-auto h-16 w-auto drop-shadow"
+        />
+
+        <div className="mt-3 text-center">
+          <Heading size="7" className="text-white">
+            {TITLES[step]}
+          </Heading>
+          <Text as="div" size="2" className="mt-1 text-white/60">
+            {SUBS[step]}
+          </Text>
+        </div>
+
+        <Steps step={step} />
+
+        <div className="mt-6">
+          {step === "auth" && <AuthStep onDone={refresh} />}
+          {step === "card" && <CardStep onDone={refresh} />}
+          {step === "address" && <AddressStep onDone={refresh} />}
+          {step === "done" && (
+            <Flex direction="column" gap="3">
+              <Text size="3" align="center" className="text-white">
+                Tu cuenta está lista y tu tarjeta guardada de forma segura.
+              </Text>
+              <Button size="4" onClick={() => onOpenChange(false)}>
+                Empezar a pujar
+              </Button>
+            </Flex>
+          )}
+        </div>
+
+        {step === "auth" && (
+          <button
+            onClick={() => onOpenChange(false)}
+            className="mt-6 text-center text-sm text-white/40"
+          >
+            Solo quiero ver el en vivo →
+          </button>
         )}
-      </Dialog.Content>
-    </Dialog.Root>
+      </div>
+    </div>
   );
 }
