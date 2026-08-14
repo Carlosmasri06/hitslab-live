@@ -1,447 +1,468 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
-import { Button, Flex, Heading, Text, TextField } from "@radix-ui/themes";
-import {
-  Elements,
-  PaymentElement,
-  useElements,
-  useStripe,
-} from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
-import type { User } from "@supabase/supabase-js";
-import { createPortal } from "react-dom";
+import { Auction, supabase } from "@/lib/supabase";
+import { AccountGate, useBidder } from "./account";
+import { useLocalParticipant, useRoomContext } from "@livekit/components-react";
+import { Button, Dialog, Flex, Text, TextField } from "@radix-ui/themes";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
-);
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  images: string[] | null;
+  stock: number;
+};
 
-export type Bidder = {
-  has_payment: boolean;
-  ship_name: string | null;
-  ship_zip: string | null;
-} | null;
+function useAuction(roomName?: string) {
+  const [auction, setAuction] = useState<Auction | null>(null);
 
-export function useBidder() {
-  const [user, setUser] = useState<User | null>(null);
-  const [bidder, setBidder] = useState<Bidder>(null);
-  const [ready, setReady] = useState(false);
-
-  const loadBidder = useCallback(async (uid: string) => {
+  const load = useCallback(async () => {
+    if (!roomName) return;
     const { data } = await supabase
-      .from("bidders")
-      .select("has_payment,ship_name,ship_zip")
-      .eq("user_id", uid)
-      .maybeSingle();
-    setBidder((data as Bidder) ?? null);
-  }, []);
+      .from("auctions")
+      .select("*")
+      .eq("room_name", roomName)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    setAuction((data && (data[0] as Auction)) || null);
+  }, [roomName]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      const u = data.session?.user ?? null;
-      setUser(u);
-      if (u) void loadBidder(u.id);
-      setReady(true);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      const u = session?.user ?? null;
-      setUser(u);
-      if (u) void loadBidder(u.id);
-      else setBidder(null);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, [loadBidder]);
+    if (!roomName) return;
+    load();
+    const channel = supabase
+      .channel(`auctions-${roomName}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "auctions",
+          filter: `room_name=eq.${roomName}`,
+        },
+        () => load()
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [roomName, load]);
 
-  const refresh = useCallback(async () => {
-    const { data } = await supabase.auth.getUser();
-    if (data.user) await loadBidder(data.user.id);
-  }, [loadBidder]);
-
-  const canBid = !!user && !!bidder?.has_payment && !!bidder?.ship_zip;
-  return { user, bidder, canBid, ready, refresh };
+  return { auction, reload: load };
 }
 
-function AuthStep({ onDone }: { onDone: () => void }) {
-  const [mode, setMode] = useState<"signup" | "login">("signup");
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const pwRef = useRef<HTMLInputElement>(null);
-
-  const submit = async () => {
-    if (!email || pw.length < 6) return;
-    setBusy(true);
-    setErr("");
-    const { data, error } =
-      mode === "signup"
-        ? await supabase.auth.signUp({ email, password: pw })
-        : await supabase.auth.signInWithPassword({ email, password: pw });
-    setBusy(false);
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-    if (!data.session) {
-      setErr(
-        "Cuenta creada. Revisa tu correo para confirmarla y vuelve a entrar."
-      );
-      return;
-    }
-    onDone();
-  };
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void submit();
-      }}
-    >
-      <Flex direction="column" gap="3">
-        <Flex direction="column" gap="2" className="mb-1">
-          <Text size="2" className="text-white/70">
-            ✓ Puja en vivo por cartas exclusivas
-          </Text>
-          <Text size="2" className="text-white/70">
-            ✓ Pago 100% seguro con Stripe
-          </Text>
-          <Text size="2" className="text-white/70">
-            ✓ Envío a domicilio en cuanto ganes
-          </Text>
-        </Flex>
-        <TextField.Input
-          size="3"
-          style={{ fontSize: 16 }}
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          enterKeyHint="next"
-          placeholder="Correo"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              pwRef.current?.focus();
-            }
-          }}
-        />
-        <TextField.Input
-          ref={pwRef}
-          size="3"
-          style={{ fontSize: 16 }}
-          type="password"
-          autoComplete={mode === "signup" ? "new-password" : "current-password"}
-          enterKeyHint="go"
-          placeholder="Contraseña (mín. 6)"
-          value={pw}
-          onChange={(e) => setPw(e.target.value)}
-        />
-        {err && (
-          <Text size="1" color="red">
-            {err}
-          </Text>
-        )}
-        <Button
-          type="submit"
-          size="4"
-          disabled={busy || !email || pw.length < 6}
-        >
-          {busy ? "..." : mode === "signup" ? "Crear cuenta" : "Iniciar sesión"}
-        </Button>
-        <button
-          type="button"
-          className="text-sm text-accent-11 underline"
-          onClick={() => setMode(mode === "signup" ? "login" : "signup")}
-        >
-          {mode === "signup"
-            ? "¿Ya tienes cuenta? Inicia sesión"
-            : "¿Nuevo? Crea una cuenta"}
-        </button>
-      </Flex>
-    </form>
-  );
-}
-function CardInner({ onDone }: { onDone: () => void }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-
-  const submit = async () => {
-    if (!stripe || !elements) return;
-    setBusy(true);
-    setErr("");
-    const { error, setupIntent } = await stripe.confirmSetup({
-      elements,
-      redirect: "if_required",
-    });
-    if (error) {
-      setErr(error.message || "Error con la tarjeta");
-      setBusy(false);
-      return;
-    }
-    const { data } = await supabase.auth.getSession();
-    await fetch("/api/account/confirm-card", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${data.session?.access_token}`,
-      },
-      body: JSON.stringify({ setup_intent_id: setupIntent?.id }),
-    });
-    setBusy(false);
-    onDone();
-  };
-
-  return (
-    <Flex direction="column" gap="3">
-      <PaymentElement />
-      {err && (
-        <Text size="1" color="red">
-          {err}
-        </Text>
-      )}
-      <Button size="4" disabled={busy} onClick={submit}>
-        {busy ? "Guardando..." : "Guardar tarjeta"}
-      </Button>
-      <Text size="1" className="text-white/50 text-center">
-        🔒 Tus datos van directo y cifrados a Stripe.
-      </Text>
-    </Flex>
-  );
-}
-
-function CardStep({ onDone }: { onDone: () => void }) {
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [err, setErr] = useState("");
-
+function useCountdown(endsAt?: string | null) {
+  const [left, setLeft] = useState(0);
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const res = await fetch("/api/account/setup-card", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${data.session?.access_token}` },
-      });
-      if (!res.ok) {
-        setErr("No se pudo iniciar el pago, intenta de nuevo");
-        return;
-      }
-      const j = await res.json();
-      setClientSecret(j.client_secret);
-    })();
-  }, []);
-
-  if (err)
-    return (
-      <Text size="2" color="red">
-        {err}
-      </Text>
-    );
-  if (!clientSecret)
-    return (
-      <Text size="2" className="text-white/60">
-        Cargando pago seguro...
-      </Text>
-    );
-
-  return (
-    <Elements
-      stripe={stripePromise}
-      options={{ clientSecret, appearance: { theme: "night" } }}
-    >
-      <CardInner onDone={onDone} />
-    </Elements>
-  );
-}
-
-function AddressStep({ onDone }: { onDone: () => void }) {
-  const [f, setF] = useState({
-    ship_name: "",
-    ship_phone: "",
-    ship_street: "",
-    ship_ext: "",
-    ship_int: "",
-    ship_neighborhood: "",
-    ship_city: "",
-    ship_state: "",
-    ship_zip: "",
-  });
-  const [busy, setBusy] = useState(false);
-
-  const upd =
-    (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
-      setF({ ...f, [k]: e.target.value });
-
-  const S = { fontSize: 16 } as const;
-  const ok =
-    !!f.ship_name &&
-    !!f.ship_phone &&
-    !!f.ship_street &&
-    !!f.ship_neighborhood &&
-    !!f.ship_city &&
-    !!f.ship_state &&
-    f.ship_zip.length >= 5;
-
-  const save = async () => {
-    if (!ok) return;
-    setBusy(true);
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      await supabase
-        .from("bidders")
-        .update({ ...f, updated_at: new Date().toISOString() })
-        .eq("user_id", data.user.id);
+    if (!endsAt) {
+      setLeft(0);
+      return;
     }
-    setBusy(false);
-    onDone();
-  };
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save();
-      }}
-    >
-      <Flex direction="column" gap="2">
-        <TextField.Input size="3" style={S} enterKeyHint="next" autoComplete="name" placeholder="Nombre completo" value={f.ship_name} onChange={upd("ship_name")} />
-        <TextField.Input size="3" style={S} enterKeyHint="next" inputMode="tel" autoComplete="tel" placeholder="Teléfono" value={f.ship_phone} onChange={upd("ship_phone")} />
-        <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Calle" value={f.ship_street} onChange={upd("ship_street")} />
-        <Flex gap="2">
-          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="No. ext" value={f.ship_ext} onChange={upd("ship_ext")} />
-          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="No. int (opc)" value={f.ship_int} onChange={upd("ship_int")} />
-        </Flex>
-        <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Colonia" value={f.ship_neighborhood} onChange={upd("ship_neighborhood")} />
-        <Flex gap="2">
-          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Ciudad" value={f.ship_city} onChange={upd("ship_city")} />
-          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Estado" value={f.ship_state} onChange={upd("ship_state")} />
-        </Flex>
-        <TextField.Input size="3" style={S} enterKeyHint="done" inputMode="numeric" autoComplete="postal-code" placeholder="Código postal" value={f.ship_zip} onChange={upd("ship_zip")} />
-        <Button type="submit" size="4" disabled={busy || !ok}>
-          {busy ? "Guardando..." : "Guardar y empezar a pujar"}
-        </Button>
-      </Flex>
-    </form>
-  );
-}
-function Steps({ step }: { step: string }) {
-  const order = ["auth", "card", "address"];
-  const idx = step === "done" ? 3 : order.indexOf(step);
-  return (
-    <Flex gap="2" justify="center" mt="4">
-      {order.map((_, i) => (
-        <div
-          key={i}
-          className={
-            "h-1.5 w-12 rounded-full " +
-            (i <= idx ? "bg-accent-9" : "bg-white/15")
-          }
-        />
-      ))}
-    </Flex>
-  );
+    const tick = () => {
+      const ms = new Date(endsAt).getTime() - Date.now();
+      setLeft(Math.max(0, Math.ceil(ms / 1000)));
+    };
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [endsAt]);
+  return left;
 }
 
-const TITLES: Record<string, string> = {
-  auth: "Únete al remate",
-  card: "Agrega tu tarjeta",
-  address: "¿A dónde te lo enviamos?",
-  done: "¡Listo! 🔨",
-};
-const SUBS: Record<string, string> = {
-  auth: "Crea tu cuenta para pujar en vivo",
-  card: "Guárdala una vez, puja siempre",
-  address: "Tu dirección para cuando ganes",
-  done: "Ya puedes pujar en el en vivo",
-};
-
-export function AccountGate({
-  open,
-  onOpenChange,
-  user,
-  bidder,
-  refresh,
+function SlideToBid({
+  label,
+  onConfirm,
+  disabled,
+  locked,
+  onLocked,
 }: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  user: User | null;
-  bidder: Bidder;
-  refresh: () => void;
+  label: string;
+  onConfirm: () => void;
+  disabled?: boolean;
+  locked?: boolean;
+  onLocked?: () => void;
 }) {
-  const step = !user
-    ? "auth"
-    : !bidder?.has_payment
-    ? "card"
-    : !bidder?.ship_zip
-    ? "address"
-    : "done";
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [x, setX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const HANDLE = 52;
 
-  if (!open) return null;
-  if (typeof document === "undefined") return null;
+  const maxX = () => Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE);
 
-  return createPortal(
+  const onDown = (e: React.PointerEvent) => {
+    if (locked) {
+      onLocked?.();
+      return;
+    }
+    if (disabled) return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setDragging(true);
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (!dragging || !trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    const nx = Math.max(0, Math.min(maxX(), e.clientX - rect.left - HANDLE / 2));
+    setX(nx);
+  };
+  const finish = () => {
+    if (!dragging) return;
+    setDragging(false);
+    const reached = x >= maxX() * 0.9 && maxX() > 0;
+    setX(0);
+    if (reached) onConfirm();
+  };
+
+  return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto"
-      style={{
-        background:
-          "radial-gradient(130% 60% at 50% 0%, rgba(245,158,11,0.18), rgba(10,10,10,0) 55%), #0a0a0a",
-      }}
+      ref={trackRef}
+      style={{ touchAction: "none" }}
+      className={
+        "relative h-[52px] rounded-full overflow-hidden select-none " +
+        (locked ? "bg-white/10" : "bg-white/15")
+      }
     >
-      <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-10 pt-5">
-        <button
-          onClick={() => onOpenChange(false)}
-          className="self-end text-2xl leading-none text-white/60"
-          aria-label="Cerrar"
-        >
-          ✕
-        </button>
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-14">
+        <Text size="2" weight="bold" className="text-white/90 truncate">
+          {label}
+        </Text>
+      </div>
+      <div
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={finish}
+        onPointerCancel={finish}
+        style={{
+          width: HANDLE,
+          height: HANDLE,
+          transform: `translateX(${x}px)`,
+          touchAction: "none",
+        }}
+        className={
+          "absolute left-0 top-0 rounded-full flex items-center justify-center text-xl font-bold " +
+          (locked ? "bg-gray-7 text-gray-11 " : "bg-accent-9 text-black ") +
+          (disabled ? "opacity-50 " : "") +
+          (dragging ? "" : "transition-transform")
+        }
+      >
+        →
+      </div>
+    </div>
+  );
+}
 
-        <img
-          src="/hitslab-logo.png"
-          alt="HITS LAB"
-          className="mx-auto h-16 w-auto drop-shadow"
+function StartAuctionDialog({
+  roomName,
+  onStarted,
+}: {
+  roomName: string;
+  onStarted: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Product | null>(null);
+  const [price, setPrice] = useState("");
+  const [increment, setIncrement] = useState("50");
+  const [duration, setDuration] = useState("15");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    supabase
+      .from("products")
+      .select("id,name,price,images,stock")
+      .eq("active", true)
+      .order("featured", { ascending: false })
+      .order("name")
+      .limit(300)
+      .then(({ data }) => setProducts((data as Product[]) || []));
+  }, [open]);
+
+  const filtered = products.filter((p) =>
+    p.name.toLowerCase().includes(q.toLowerCase())
+  );
+
+  const pick = (p: Product) => {
+    setSelected(p);
+    setPrice(p.price != null ? String(Math.round(p.price * 0.6)) : "");
+  };
+
+  const start = async () => {
+    if (!selected) return;
+    setBusy(true);
+    await supabase.rpc("create_auction", {
+      p_room: roomName,
+      p_title: selected.name.trim(),
+      p_image_url: selected.images?.[0] ?? null,
+      p_start_price: Number(price) || 0,
+      p_increment: Number(increment) || 10,
+      p_duration_seconds: Number(duration) || 30,
+    });
+    setBusy(false);
+    setOpen(false);
+    setSelected(null);
+    setQ("");
+    onStarted();
+  };
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger>
+        <Button size="2" radius="full" className="w-full">
+          ➕ Subastar artículo
+        </Button>
+      </Dialog.Trigger>
+      <Dialog.Content style={{ maxWidth: 460 }}>
+        <Dialog.Title>Subastar artículo</Dialog.Title>
+        <TextField.Input
+          style={{ fontSize: 16 }}
+          placeholder="Buscar en tu tienda..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
         />
-
-        <div className="mt-3 text-center">
-          <Heading size="7" className="text-white">
-            {TITLES[step]}
-          </Heading>
-          <Text as="div" size="2" className="mt-1 text-white/60">
-            {SUBS[step]}
-          </Text>
-        </div>
-
-        <Steps step={step} />
-
-        <div className="mt-6">
-          {step === "auth" && <AuthStep onDone={refresh} />}
-          {step === "card" && <CardStep onDone={refresh} />}
-          {step === "address" && <AddressStep onDone={refresh} />}
-          {step === "done" && (
-            <Flex direction="column" gap="3">
-              <Text size="3" align="center" className="text-white">
-                Tu cuenta está lista y tu tarjeta guardada de forma segura.
-              </Text>
-              <Button size="4" onClick={() => onOpenChange(false)}>
-                Empezar a pujar
-              </Button>
-            </Flex>
+        <div
+          style={{ maxHeight: 260, overflowY: "auto" }}
+          className="mt-2 flex flex-col gap-1"
+        >
+          {filtered.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => pick(p)}
+              className={
+                "flex items-center gap-2 rounded-lg p-2 text-left transition-colors " +
+                (selected?.id === p.id ? "bg-accent-4" : "hover:bg-gray-3")
+              }
+            >
+              <img
+                src={p.images?.[0] || ""}
+                alt=""
+                className="h-10 w-10 rounded object-cover bg-gray-4 shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm truncate">{p.name}</div>
+                <div className="text-xs text-gray-11">
+                  ${Number(p.price).toLocaleString()} · stock {p.stock}
+                </div>
+              </div>
+            </button>
+          ))}
+          {filtered.length === 0 && (
+            <Text size="1" className="text-gray-11 p-2">
+              Sin resultados
+            </Text>
           )}
         </div>
 
-        {step === "auth" && (
-          <button
-            onClick={() => onOpenChange(false)}
-            className="mt-6 text-center text-sm text-white/40"
-          >
-            Solo quiero ver el en vivo →
-          </button>
+        {selected && (
+          <Flex direction="column" gap="2" mt="3">
+            <Text size="1" weight="bold">
+              Subastando: {selected.name}
+            </Text>
+            <Flex gap="2">
+              <label style={{ flex: 1 }}>
+                <Text as="div" size="1" mb="1">
+                  Precio inicial
+                </Text>
+                <TextField.Input
+                  style={{ fontSize: 16 }}
+                  type="number"
+                  inputMode="decimal"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                />
+              </label>
+              <label style={{ flex: 1 }}>
+                <Text as="div" size="1" mb="1">
+                  Incremento
+                </Text>
+                <TextField.Input
+                  style={{ fontSize: 16 }}
+                  type="number"
+                  inputMode="decimal"
+                  value={increment}
+                  onChange={(e) => setIncrement(e.target.value)}
+                />
+              </label>
+              <label style={{ flex: 1 }}>
+                <Text as="div" size="1" mb="1">
+                  Segundos
+                </Text>
+                <TextField.Input
+                  style={{ fontSize: 16 }}
+                  type="number"
+                  inputMode="numeric"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                />
+              </label>
+            </Flex>
+            <Button size="3" disabled={busy} onClick={start}>
+              {busy ? "Iniciando..." : "Iniciar subasta"}
+            </Button>
+          </Flex>
+        )}
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
+
+export function AuctionBar({ isHost }: { isHost: boolean }) {
+  const { name: roomName } = useRoomContext();
+  const { localParticipant } = useLocalParticipant();
+  const { auction, reload } = useAuction(roomName);
+  const left = useCountdown(auction?.ends_at);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const { user, bidder, canBid, refresh } = useBidder();
+  const [gateOpen, setGateOpen] = useState(false);
+
+  const live = !!auction && auction.status === "live" && left > 0;
+  const ended = !!auction && auction.status === "live" && left <= 0;
+
+  const nextBid = auction
+    ? auction.current_bidder
+      ? Number(auction.current_price) + Number(auction.bid_increment)
+      : Number(auction.start_price)
+    : 0;
+
+  const bid = async () => {
+    if (!auction) return;
+    setBusy(true);
+    setErr("");
+    const { data } = await supabase.rpc("place_bid", {
+      p_auction_id: auction.id,
+      p_bidder: user?.id ?? localParticipant.identity,
+      p_bidder_name:
+        bidder?.ship_name || user?.email || localParticipant.identity,
+      p_amount: nextBid,
+    });
+    setBusy(false);
+    const res = data as { ok: boolean; error?: string } | null;
+    if (res && !res.ok) {
+      setErr(
+        res.error === "muy_baja"
+          ? "Puja muy baja, recarga"
+          : res.error === "cerrada"
+          ? "Subasta cerrada"
+          : "Error, intenta de nuevo"
+      );
+      reload();
+    }
+  };
+
+  // El registro vive SIEMPRE montado (fuera de la subasta) para que no se
+  // cierre cuando la subasta acaba/cambia mientras capturan sus datos.
+  const gate = !isHost ? (
+    <AccountGate
+      open={gateOpen}
+      onOpenChange={setGateOpen}
+      user={user}
+      bidder={bidder}
+      refresh={refresh}
+    />
+  ) : null;
+
+  let content: React.ReactNode = null;
+
+  if (live) {
+    content = (
+      <div className="pointer-events-auto mb-2 rounded-2xl bg-black/70 backdrop-blur px-3 py-2">
+        <Flex align="center" gap="2">
+          {auction!.image_url && (
+            <img
+              src={auction!.image_url}
+              alt=""
+              className="h-12 w-12 rounded-lg object-cover shrink-0"
+            />
+          )}
+          <Flex direction="column" className="min-w-0 flex-1">
+            <Text size="2" weight="bold" className="text-white truncate">
+              {auction!.title}
+            </Text>
+            <Text size="1" className="text-white/70 truncate">
+              {auction!.current_bidder_name
+                ? `Va ganando: ${auction!.current_bidder_name}`
+                : "Sé el primero en pujar"}
+            </Text>
+          </Flex>
+          <Flex direction="column" align="end" className="shrink-0">
+            <Text size="5" weight="bold" className="text-accent-11">
+              ${Number(auction!.current_price).toLocaleString()}
+            </Text>
+            <Text
+              size="1"
+              weight="bold"
+              className={left <= 10 ? "text-red-9" : "text-white/70"}
+            >
+              {left}s
+            </Text>
+          </Flex>
+        </Flex>
+        {!isHost && (
+          <div className="mt-2">
+            <SlideToBid
+              label={
+                canBid
+                  ? busy
+                    ? "Pujando..."
+                    : `Desliza para pujar $${nextBid.toLocaleString()}`
+                  : "🔒 Agrega tu tarjeta para pujar"
+              }
+              onConfirm={bid}
+              disabled={busy}
+              locked={!canBid}
+              onLocked={() => setGateOpen(true)}
+            />
+          </div>
+        )}
+        {err && (
+          <Text as="div" size="1" className="text-red-9 mt-1">
+            {err}
+          </Text>
         )}
       </div>
-    </div>,
-    document.body
+    );
+  } else if (ended && auction!.current_bidder_name) {
+    content = (
+      <div className="pointer-events-auto mb-2 rounded-2xl bg-black/70 backdrop-blur px-3 py-2">
+        <Flex align="center" gap="2">
+          {auction!.image_url && (
+            <img
+              src={auction!.image_url}
+              alt=""
+              className="h-10 w-10 rounded-lg object-cover shrink-0"
+            />
+          )}
+          <div className="min-w-0">
+            <Text size="2" weight="bold" className="text-white truncate">
+              🔨 Vendido: {auction!.title}
+            </Text>
+            <Text as="div" size="1" className="text-accent-11">
+              a {auction!.current_bidder_name} por $
+              {Number(auction!.current_price).toLocaleString()}
+            </Text>
+          </div>
+        </Flex>
+        {isHost && (
+          <div className="mt-2">
+            <StartAuctionDialog roomName={roomName!} onStarted={reload} />
+          </div>
+        )}
+      </div>
+    );
+  } else if (isHost && roomName) {
+    content = (
+      <div className="pointer-events-auto mb-2">
+        <StartAuctionDialog roomName={roomName} onStarted={reload} />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {gate}
+      {content}
+    </>
   );
 }
