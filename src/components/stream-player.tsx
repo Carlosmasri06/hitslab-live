@@ -41,8 +41,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PresenceDialog } from "./presence-dialog";
 import { useAuthToken } from "./token-context";
 
-function useKeyboardHeight() {
-  const [kb, setKb] = useState(0);
+// Sizes the overlay to the visible area (above the keyboard) and hard-locks
+// the page so iOS Safari can't push the whole thing up.
+function useVisualViewport() {
+  const [vp, setVp] = useState<{ height: string | number; top: number }>({
+    height: "100dvh",
+    top: 0,
+  });
   useEffect(() => {
     const body = document.body;
     const prev = {
@@ -64,8 +69,7 @@ function useKeyboardHeight() {
 
     const vv = window.visualViewport;
     const onChange = () => {
-      if (!vv) return;
-      setKb(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+      if (vv) setVp({ height: vv.height, top: vv.offsetTop });
     };
     if (vv) {
       vv.addEventListener("resize", onChange);
@@ -80,7 +84,7 @@ function useKeyboardHeight() {
       Object.assign(body.style, prev);
     };
   }, []);
-  return kb;
+  return vp;
 }
 
 function ConfettiCanvas() {
@@ -102,9 +106,7 @@ function ConfettiCanvas() {
     setConfetti(new Confetti({ canvas: canvasEl?.current ?? undefined }));
   }, []);
 
-  return (
-    <canvas ref={canvasEl} className="absolute inset-0 h-full w-full z-10" />
-  );
+  return <canvas ref={canvasEl} className="absolute inset-0 h-full w-full" />;
 }
 
 const CHAT_LIFETIME = 10000;
@@ -118,7 +120,7 @@ type FeedItem = {
   timestamp: number;
 };
 
-function ChatOverlay({ kb }: { kb: number }) {
+function ChatOverlay() {
   const { chatMessages } = useChat();
   const participants = useParticipants();
   const [now, setNow] = useState(() => Date.now());
@@ -184,10 +186,7 @@ function ChatOverlay({ kb }: { kb: number }) {
   }, [chatMessages, joins, now]);
 
   return (
-    <div
-      style={{ transform: `translateY(-${kb}px)` }}
-      className="absolute left-3 right-20 bottom-28 z-20 flex flex-col items-start gap-1.5 pointer-events-none transition-transform duration-150"
-    >
+    <div className="absolute left-3 right-20 bottom-24 z-20 flex flex-col items-start gap-1.5 pointer-events-none">
       {feed.map((it) => {
         const age = now - it.timestamp;
         const opacity =
@@ -243,7 +242,7 @@ function RightRail() {
   };
 
   return (
-    <div className="absolute right-3 bottom-28 z-20 flex flex-col items-center gap-5">
+    <div className="absolute right-3 bottom-24 z-20 flex flex-col items-center gap-5 pointer-events-auto">
       <Flex direction="column" align="center" gap="1">
         <button
           onClick={share}
@@ -304,7 +303,7 @@ function CameraControls() {
     devices.find((d) => d.deviceId === activeDeviceId)?.label ?? "";
   const onFront = isFront(activeLabel);
 
-  const pickWide = () =>
+  const wide =
     backDevices.find((d) => {
       const l = d.label.toLowerCase();
       return (
@@ -314,11 +313,9 @@ function CameraControls() {
         !l.includes("triple")
       );
     }) ?? backDevices[0];
-
   const ultra = backDevices.find((d) =>
     d.label.toLowerCase().includes("ultra")
   );
-  const wide = pickWide();
   const tele = backDevices.find((d) => d.label.toLowerCase().includes("tele"));
 
   const flip = () => {
@@ -456,7 +453,7 @@ function BottomBar({ isHost }: { isHost: boolean }) {
 }
 
 export function StreamPlayer({ isHost = false }) {
-  const kb = useKeyboardHeight();
+  const vp = useVisualViewport();
   const [following, setFollowing] = useState(false);
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack>();
   const localVideoEl = useRef<HTMLVideoElement>(null);
@@ -468,13 +465,6 @@ export function StreamPlayer({ isHost = false }) {
   const canHost =
     isHost || (localMetadata?.invited_to_stage && localMetadata?.hand_raised);
   const participants = useParticipants();
-  const showNotification = isHost
-    ? participants.some((p) => {
-        const metadata = (p.metadata &&
-          JSON.parse(p.metadata)) as ParticipantMetadata;
-        return metadata?.hand_raised && !metadata?.invited_to_stage;
-      })
-    : localMetadata?.invited_to_stage && !localMetadata?.hand_raised;
 
   useEffect(() => {
     if (canHost) {
@@ -491,9 +481,7 @@ export function StreamPlayer({ isHost = false }) {
   }, [canHost]);
 
   const { devices: cameraDevices, activeDeviceId: activeCameraDeviceId } =
-    useMediaDeviceSelect({
-      kind: "videoinput",
-    });
+    useMediaDeviceSelect({ kind: "videoinput" });
 
   useEffect(() => {
     if (localVideoTrack) {
@@ -508,136 +496,141 @@ export function StreamPlayer({ isHost = false }) {
   const remoteVideoTracks = useTracks([Track.Source.Camera]).filter(
     (t) => t.participant.identity !== localParticipant.identity
   );
-
   const remoteAudioTracks = useTracks([Track.Source.Microphone]).filter(
     (t) => t.participant.identity !== localParticipant.identity
   );
 
   return (
-    <div
-      style={{ position: "fixed", inset: 0 }}
-      className="overflow-hidden bg-black"
-    >
-      <Grid className="absolute inset-0 w-full h-full">
-        {canHost && (
-          <div className="relative">
-            <Flex className="absolute inset-0" align="center" justify="center">
-              <Avatar
-                size="9"
-                fallback={localParticipant.identity[0] ?? "?"}
-                radius="full"
-              />
-            </Flex>
-            <video
-              ref={localVideoEl}
-              className={
-                "absolute inset-0 w-full h-full object-cover bg-transparent " +
-                (mirrorSelf ? "-scale-x-100" : "")
-              }
-            />
-          </div>
-        )}
-        {remoteVideoTracks.map((t) => (
-          <div key={t.participant.identity} className="relative">
-            <Flex className="absolute inset-0" align="center" justify="center">
-              <Avatar
-                size="9"
-                fallback={t.participant.identity[0] ?? "?"}
-                radius="full"
-              />
-            </Flex>
-            <VideoTrack
-              trackRef={t}
-              className="absolute inset-0 w-full h-full object-cover bg-transparent"
-            />
-          </div>
-        ))}
-      </Grid>
-
-      {remoteAudioTracks.map((t) => (
-        <AudioTrack trackRef={t} key={t.participant.identity} />
-      ))}
-
-      <ConfettiCanvas />
-      <StartAudio
-        label="Toca para activar el audio"
-        className="absolute inset-0 w-full h-full bg-gray-2-translucent text-white z-40"
-      />
-
-      <div className="pointer-events-none absolute top-0 inset-x-0 h-28 z-10 bg-gradient-to-b from-black/60 to-transparent" />
-      <div className="pointer-events-none absolute bottom-0 inset-x-0 h-44 z-10 bg-gradient-to-t from-black/70 to-transparent" />
-
-      <div className="absolute top-0 inset-x-0 p-3 z-30">
-        <Flex justify="between" align="center" gap="2">
-          <Flex align="center" gap="2">
-            <img
-              src="/hitslab-logo.png"
-              alt="HITS LAB"
-              className="h-9 w-auto pointer-events-none select-none drop-shadow"
-            />
-            {roomState === ConnectionState.Connected && (
-              <Flex
-                align="center"
-                gap="1"
-                className="rounded-full bg-black/40 backdrop-blur px-2 py-1"
-              >
-                <div className="rounded-full bg-red-9 w-2 h-2 animate-pulse" />
-                <Text size="1" weight="bold" className="uppercase text-white">
-                  Live
-                </Text>
-              </Flex>
-            )}
-            {!isHost && (
-              <button
-                onClick={() => setFollowing((f) => !f)}
-                className={
-                  "rounded-full px-3 py-1 text-xs font-bold " +
-                  (following
-                    ? "bg-black/40 text-white backdrop-blur"
-                    : "bg-accent-9 text-black")
-                }
-              >
-                {following ? "Siguiendo" : "Seguir"}
-              </button>
-            )}
-          </Flex>
-          <PresenceDialog isHost={isHost}>
-            <div className="relative">
-              {showNotification && (
-                <div className="absolute flex h-3 w-3 -top-1 -right-1">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-11 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-accent-11"></span>
-                </div>
-              )}
-              <Button
-                size="1"
-                variant="soft"
-                radius="full"
-                disabled={roomState !== ConnectionState.Connected}
-              >
-                {roomState === ConnectionState.Connected ? (
-                  <EyeOpenIcon />
-                ) : (
-                  <EyeClosedIcon />
-                )}
-                {roomState === ConnectionState.Connected
-                  ? participants.length
-                  : ""}
-              </Button>
-            </div>
-          </PresenceDialog>
-        </Flex>
-      </div>
-
-      <ChatOverlay kb={kb} />
-      {!isHost && <RightRail />}
-
+    <>
+      {/* VIDEO LAYER — full screen, stays fixed even when keyboard opens */}
       <div
-        style={{ transform: `translateY(-${kb}px)` }}
-        className="absolute bottom-0 inset-x-0 p-3 z-30 transition-transform duration-150"
+        style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100vh" }}
+        className="overflow-hidden bg-black"
       >
-        <BottomBar isHost={isHost} />
+        <Grid className="absolute inset-0 w-full h-full">
+          {canHost && (
+            <div className="relative">
+              <Flex className="absolute inset-0" align="center" justify="center">
+                <Avatar
+                  size="9"
+                  fallback={localParticipant.identity[0] ?? "?"}
+                  radius="full"
+                />
+              </Flex>
+              <video
+                ref={localVideoEl}
+                className={
+                  "absolute inset-0 w-full h-full object-cover bg-transparent " +
+                  (mirrorSelf ? "-scale-x-100" : "")
+                }
+              />
+            </div>
+          )}
+          {remoteVideoTracks.map((t) => (
+            <div key={t.participant.identity} className="relative">
+              <Flex className="absolute inset-0" align="center" justify="center">
+                <Avatar
+                  size="9"
+                  fallback={t.participant.identity[0] ?? "?"}
+                  radius="full"
+                />
+              </Flex>
+              <VideoTrack
+                trackRef={t}
+                className="absolute inset-0 w-full h-full object-cover bg-transparent"
+              />
+            </div>
+          ))}
+        </Grid>
+
+        {remoteAudioTracks.map((t) => (
+          <AudioTrack trackRef={t} key={t.participant.identity} />
+        ))}
+
+        <ConfettiCanvas />
+        <StartAudio
+          label="Toca para activar el audio"
+          className="absolute inset-0 w-full h-full bg-gray-2-translucent text-white z-40"
+        />
       </div>
-    </div>
+
+      {/* OVERLAY LAYER — sized to visible area (above the keyboard) */}
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          top: vp.top,
+          height: vp.height,
+        }}
+        className="overflow-hidden pointer-events-none"
+      >
+        <div className="pointer-events-none absolute top-0 inset-x-0 h-28 bg-gradient-to-b from-black/60 to-transparent" />
+        <div className="pointer-events-none absolute bottom-0 inset-x-0 h-40 bg-gradient-to-t from-black/70 to-transparent" />
+
+        <div className="absolute top-0 inset-x-0 p-3 z-30 pointer-events-auto">
+          <Flex justify="between" align="center" gap="2">
+            <Flex align="center" gap="2">
+              <img
+                src="/hitslab-logo.png"
+                alt="HITS LAB"
+                className="h-9 w-auto pointer-events-none select-none drop-shadow"
+              />
+              {roomState === ConnectionState.Connected && (
+                <Flex
+                  align="center"
+                  gap="1"
+                  className="rounded-full bg-black/40 backdrop-blur px-2 py-1"
+                >
+                  <div className="rounded-full bg-red-9 w-2 h-2 animate-pulse" />
+                  <Text size="1" weight="bold" className="uppercase text-white">
+                    Live
+                  </Text>
+                </Flex>
+              )}
+              {!isHost && (
+                <button
+                  onClick={() => setFollowing((f) => !f)}
+                  className={
+                    "rounded-full px-3 py-1 text-xs font-bold " +
+                    (following
+                      ? "bg-black/40 text-white backdrop-blur"
+                      : "bg-accent-9 text-black")
+                  }
+                >
+                  {following ? "Siguiendo" : "Seguir"}
+                </button>
+              )}
+            </Flex>
+            <PresenceDialog isHost={isHost}>
+              <div className="relative">
+                <Button
+                  size="1"
+                  variant="soft"
+                  radius="full"
+                  disabled={roomState !== ConnectionState.Connected}
+                >
+                  {roomState === ConnectionState.Connected ? (
+                    <EyeOpenIcon />
+                  ) : (
+                    <EyeClosedIcon />
+                  )}
+                  {roomState === ConnectionState.Connected
+                    ? participants.length
+                    : ""}
+                </Button>
+              </div>
+            </PresenceDialog>
+          </Flex>
+        </div>
+
+        <ChatOverlay />
+        {!isHost && <RightRail />}
+
+        <div className="absolute bottom-0 inset-x-0 p-3 z-30 pointer-events-auto">
+          <BottomBar isHost={isHost} />
+        </div>
+      </div>
+    </>
   );
 }
