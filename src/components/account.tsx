@@ -11,7 +11,7 @@ import {
 import { loadStripe } from "@stripe/stripe-js";
 import type { User } from "@supabase/supabase-js";
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
@@ -68,8 +68,10 @@ function AuthStep({ onDone }: { onDone: () => void }) {
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const pwRef = useRef<HTMLInputElement>(null);
 
   const submit = async () => {
+    if (!email || pw.length < 6) return;
     setBusy(true);
     setErr("");
     const { data, error } =
@@ -91,59 +93,77 @@ function AuthStep({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <Flex direction="column" gap="3">
-      <Flex direction="column" gap="2" className="mb-1">
-        <Text size="2" className="text-white/70">
-          ✓ Puja en vivo por cartas exclusivas
-        </Text>
-        <Text size="2" className="text-white/70">
-          ✓ Pago 100% seguro con Stripe
-        </Text>
-        <Text size="2" className="text-white/70">
-          ✓ Envío a domicilio en cuanto ganes
-        </Text>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void submit();
+      }}
+    >
+      <Flex direction="column" gap="3">
+        <Flex direction="column" gap="2" className="mb-1">
+          <Text size="2" className="text-white/70">
+            ✓ Puja en vivo por cartas exclusivas
+          </Text>
+          <Text size="2" className="text-white/70">
+            ✓ Pago 100% seguro con Stripe
+          </Text>
+          <Text size="2" className="text-white/70">
+            ✓ Envío a domicilio en cuanto ganes
+          </Text>
+        </Flex>
+        <TextField.Input
+          size="3"
+          style={{ fontSize: 16 }}
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          enterKeyHint="next"
+          placeholder="Correo"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              pwRef.current?.focus();
+            }
+          }}
+        />
+        <TextField.Input
+          ref={pwRef}
+          size="3"
+          style={{ fontSize: 16 }}
+          type="password"
+          autoComplete={mode === "signup" ? "new-password" : "current-password"}
+          enterKeyHint="go"
+          placeholder="Contraseña (mín. 6)"
+          value={pw}
+          onChange={(e) => setPw(e.target.value)}
+        />
+        {err && (
+          <Text size="1" color="red">
+            {err}
+          </Text>
+        )}
+        <Button
+          type="submit"
+          size="4"
+          disabled={busy || !email || pw.length < 6}
+        >
+          {busy ? "..." : mode === "signup" ? "Crear cuenta" : "Iniciar sesión"}
+        </Button>
+        <button
+          type="button"
+          className="text-sm text-accent-11 underline"
+          onClick={() => setMode(mode === "signup" ? "login" : "signup")}
+        >
+          {mode === "signup"
+            ? "¿Ya tienes cuenta? Inicia sesión"
+            : "¿Nuevo? Crea una cuenta"}
+        </button>
       </Flex>
-      <TextField.Input
-        size="3"
-        style={{ fontSize: 16 }}
-        type="email"
-        inputMode="email"
-        placeholder="Correo"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <TextField.Input
-        size="3"
-        style={{ fontSize: 16 }}
-        type="password"
-        placeholder="Contraseña (mín. 6)"
-        value={pw}
-        onChange={(e) => setPw(e.target.value)}
-      />
-      {err && (
-        <Text size="1" color="red">
-          {err}
-        </Text>
-      )}
-      <Button
-        size="4"
-        disabled={busy || !email || pw.length < 6}
-        onClick={submit}
-      >
-        {busy ? "..." : mode === "signup" ? "Crear cuenta" : "Iniciar sesión"}
-      </Button>
-      <button
-        className="text-sm text-accent-11 underline"
-        onClick={() => setMode(mode === "signup" ? "login" : "signup")}
-      >
-        {mode === "signup"
-          ? "¿Ya tienes cuenta? Inicia sesión"
-          : "¿Nuevo? Crea una cuenta"}
-      </button>
-    </Flex>
+    </form>
   );
 }
-
 function CardInner({ onDone }: { onDone: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -255,7 +275,18 @@ function AddressStep({ onDone }: { onDone: () => void }) {
     (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
       setF({ ...f, [k]: e.target.value });
 
+  const S = { fontSize: 16 } as const;
+  const ok =
+    !!f.ship_name &&
+    !!f.ship_phone &&
+    !!f.ship_street &&
+    !!f.ship_neighborhood &&
+    !!f.ship_city &&
+    !!f.ship_state &&
+    f.ship_zip.length >= 5;
+
   const save = async () => {
+    if (!ok) return;
     setBusy(true);
     const { data } = await supabase.auth.getUser();
     if (data.user) {
@@ -268,38 +299,34 @@ function AddressStep({ onDone }: { onDone: () => void }) {
     onDone();
   };
 
-  const S = { fontSize: 16 } as const;
-  const ok =
-    !!f.ship_name &&
-    !!f.ship_phone &&
-    !!f.ship_street &&
-    !!f.ship_neighborhood &&
-    !!f.ship_city &&
-    !!f.ship_state &&
-    f.ship_zip.length >= 5;
-
   return (
-    <Flex direction="column" gap="2">
-      <TextField.Input size="3" style={S} placeholder="Nombre completo" value={f.ship_name} onChange={upd("ship_name")} />
-      <TextField.Input size="3" style={S} inputMode="tel" placeholder="Teléfono" value={f.ship_phone} onChange={upd("ship_phone")} />
-      <TextField.Input size="3" style={S} placeholder="Calle" value={f.ship_street} onChange={upd("ship_street")} />
-      <Flex gap="2">
-        <TextField.Input size="3" style={S} placeholder="No. ext" value={f.ship_ext} onChange={upd("ship_ext")} />
-        <TextField.Input size="3" style={S} placeholder="No. int (opc)" value={f.ship_int} onChange={upd("ship_int")} />
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      <Flex direction="column" gap="2">
+        <TextField.Input size="3" style={S} enterKeyHint="next" autoComplete="name" placeholder="Nombre completo" value={f.ship_name} onChange={upd("ship_name")} />
+        <TextField.Input size="3" style={S} enterKeyHint="next" inputMode="tel" autoComplete="tel" placeholder="Teléfono" value={f.ship_phone} onChange={upd("ship_phone")} />
+        <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Calle" value={f.ship_street} onChange={upd("ship_street")} />
+        <Flex gap="2">
+          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="No. ext" value={f.ship_ext} onChange={upd("ship_ext")} />
+          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="No. int (opc)" value={f.ship_int} onChange={upd("ship_int")} />
+        </Flex>
+        <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Colonia" value={f.ship_neighborhood} onChange={upd("ship_neighborhood")} />
+        <Flex gap="2">
+          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Ciudad" value={f.ship_city} onChange={upd("ship_city")} />
+          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Estado" value={f.ship_state} onChange={upd("ship_state")} />
+        </Flex>
+        <TextField.Input size="3" style={S} enterKeyHint="done" inputMode="numeric" autoComplete="postal-code" placeholder="Código postal" value={f.ship_zip} onChange={upd("ship_zip")} />
+        <Button type="submit" size="4" disabled={busy || !ok}>
+          {busy ? "Guardando..." : "Guardar y empezar a pujar"}
+        </Button>
       </Flex>
-      <TextField.Input size="3" style={S} placeholder="Colonia" value={f.ship_neighborhood} onChange={upd("ship_neighborhood")} />
-      <Flex gap="2">
-        <TextField.Input size="3" style={S} placeholder="Ciudad" value={f.ship_city} onChange={upd("ship_city")} />
-        <TextField.Input size="3" style={S} placeholder="Estado" value={f.ship_state} onChange={upd("ship_state")} />
-      </Flex>
-      <TextField.Input size="3" style={S} inputMode="numeric" placeholder="Código postal" value={f.ship_zip} onChange={upd("ship_zip")} />
-      <Button size="4" disabled={busy || !ok} onClick={save}>
-        {busy ? "Guardando..." : "Guardar y empezar a pujar"}
-      </Button>
-    </Flex>
+    </form>
   );
 }
-
 function Steps({ step }: { step: string }) {
   const order = ["auth", "card", "address"];
   const idx = step === "done" ? 3 : order.indexOf(step);
