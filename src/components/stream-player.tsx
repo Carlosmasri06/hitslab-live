@@ -41,22 +41,31 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PresenceDialog } from "./presence-dialog";
 import { useAuthToken } from "./token-context";
 
-function useVisualViewport() {
-  const [vp, setVp] = useState<{ height: string | number; top: number }>({
-    height: "100dvh",
-    top: 0,
-  });
+function useKeyboardHeight() {
+  const [kb, setKb] = useState(0);
   useEffect(() => {
-    const html = document.documentElement;
     const body = document.body;
-    const prevHtml = html.style.overflow;
-    const prevBody = body.style.overflow;
-    html.style.overflow = "hidden";
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      bottom: body.style.bottom,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+    body.style.position = "fixed";
+    body.style.top = "0";
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.bottom = "0";
+    body.style.width = "100%";
     body.style.overflow = "hidden";
 
     const vv = window.visualViewport;
     const onChange = () => {
-      if (vv) setVp({ height: vv.height, top: vv.offsetTop });
+      if (!vv) return;
+      setKb(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
     };
     if (vv) {
       vv.addEventListener("resize", onChange);
@@ -68,11 +77,10 @@ function useVisualViewport() {
         vv.removeEventListener("resize", onChange);
         vv.removeEventListener("scroll", onChange);
       }
-      html.style.overflow = prevHtml;
-      body.style.overflow = prevBody;
+      Object.assign(body.style, prev);
     };
   }, []);
-  return vp;
+  return kb;
 }
 
 function ConfettiCanvas() {
@@ -110,7 +118,7 @@ type FeedItem = {
   timestamp: number;
 };
 
-function ChatOverlay() {
+function ChatOverlay({ kb }: { kb: number }) {
   const { chatMessages } = useChat();
   const participants = useParticipants();
   const [now, setNow] = useState(() => Date.now());
@@ -176,7 +184,10 @@ function ChatOverlay() {
   }, [chatMessages, joins, now]);
 
   return (
-    <div className="absolute left-3 right-20 bottom-28 z-20 flex flex-col items-start gap-1.5 pointer-events-none">
+    <div
+      style={{ transform: `translateY(-${kb}px)` }}
+      className="absolute left-3 right-20 bottom-28 z-20 flex flex-col items-start gap-1.5 pointer-events-none transition-transform duration-150"
+    >
       {feed.map((it) => {
         const age = now - it.timestamp;
         const opacity =
@@ -445,7 +456,7 @@ function BottomBar({ isHost }: { isHost: boolean }) {
 }
 
 export function StreamPlayer({ isHost = false }) {
-  const vp = useVisualViewport();
+  const kb = useKeyboardHeight();
   const [following, setFollowing] = useState(false);
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack>();
   const localVideoEl = useRef<HTMLVideoElement>(null);
@@ -504,13 +515,7 @@ export function StreamPlayer({ isHost = false }) {
 
   return (
     <div
-      style={{
-        position: "fixed",
-        left: 0,
-        right: 0,
-        top: vp.top,
-        height: vp.height,
-      }}
+      style={{ position: "fixed", inset: 0 }}
       className="overflow-hidden bg-black"
     >
       <Grid className="absolute inset-0 w-full h-full">
@@ -624,10 +629,13 @@ export function StreamPlayer({ isHost = false }) {
         </Flex>
       </div>
 
-      <ChatOverlay />
+      <ChatOverlay kb={kb} />
       {!isHost && <RightRail />}
 
-      <div className="absolute bottom-0 inset-x-0 p-3 z-30">
+      <div
+        style={{ transform: `translateY(-${kb}px)` }}
+        className="absolute bottom-0 inset-x-0 p-3 z-30 transition-transform duration-150"
+      >
         <BottomBar isHost={isHost} />
       </div>
     </div>
