@@ -41,6 +41,27 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PresenceDialog } from "./presence-dialog";
 import { useAuthToken } from "./token-context";
 
+function useKeyboardInset() {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    const vv =
+      typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+    const onChange = () => {
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setInset(kb);
+    };
+    vv.addEventListener("resize", onChange);
+    vv.addEventListener("scroll", onChange);
+    onChange();
+    return () => {
+      vv.removeEventListener("resize", onChange);
+      vv.removeEventListener("scroll", onChange);
+    };
+  }, []);
+  return inset;
+}
+
 function ConfettiCanvas() {
   const [confetti, setConfetti] = useState<Confetti>();
   const [decoder] = useState(() => new TextDecoder());
@@ -76,7 +97,7 @@ type FeedItem = {
   timestamp: number;
 };
 
-function ChatOverlay() {
+function ChatOverlay({ inset }: { inset: number }) {
   const { chatMessages } = useChat();
   const participants = useParticipants();
   const [now, setNow] = useState(() => Date.now());
@@ -142,7 +163,10 @@ function ChatOverlay() {
   }, [chatMessages, joins, now]);
 
   return (
-    <div className="absolute left-3 right-20 bottom-28 z-20 flex flex-col items-start gap-1.5 pointer-events-none">
+    <div
+      style={{ transform: `translateY(-${inset}px)` }}
+      className="absolute left-3 right-20 bottom-28 z-20 flex flex-col items-start gap-1.5 pointer-events-none transition-transform duration-150"
+    >
       {feed.map((it) => {
         const age = now - it.timestamp;
         const opacity =
@@ -368,6 +392,7 @@ function BottomBar({ isHost }: { isHost: boolean }) {
         <Box className="flex-1">
           <TextField.Input
             radius="full"
+            style={{ fontSize: 16 }}
             placeholder="Escribe algo..."
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -410,6 +435,7 @@ function BottomBar({ isHost }: { isHost: boolean }) {
 }
 
 export function StreamPlayer({ isHost = false }) {
+  const keyboardInset = useKeyboardInset();
   const [following, setFollowing] = useState(false);
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack>();
   const localVideoEl = useRef<HTMLVideoElement>(null);
@@ -467,7 +493,7 @@ export function StreamPlayer({ isHost = false }) {
   );
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-black">
+    <div className="fixed inset-0 overflow-hidden bg-black">
       <Grid className="absolute inset-0 w-full h-full">
         {canHost && (
           <div className="relative">
@@ -579,10 +605,13 @@ export function StreamPlayer({ isHost = false }) {
         </Flex>
       </div>
 
-      <ChatOverlay />
+      <ChatOverlay inset={keyboardInset} />
       {!isHost && <RightRail />}
 
-      <div className="absolute bottom-0 inset-x-0 p-3 z-30">
+      <div
+        style={{ transform: `translateY(-${keyboardInset}px)` }}
+        className="absolute bottom-0 inset-x-0 p-3 z-30 transition-transform duration-150"
+      >
         <BottomBar isHost={isHost} />
       </div>
     </div>
