@@ -41,25 +41,38 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PresenceDialog } from "./presence-dialog";
 import { useAuthToken } from "./token-context";
 
-function useKeyboardInset() {
-  const [inset, setInset] = useState(0);
+function useVisualViewport() {
+  const [vp, setVp] = useState<{ height: string | number; top: number }>({
+    height: "100dvh",
+    top: 0,
+  });
   useEffect(() => {
-    const vv =
-      typeof window !== "undefined" ? window.visualViewport : null;
-    if (!vv) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    const vv = window.visualViewport;
     const onChange = () => {
-      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      setInset(kb);
+      if (vv) setVp({ height: vv.height, top: vv.offsetTop });
     };
-    vv.addEventListener("resize", onChange);
-    vv.addEventListener("scroll", onChange);
-    onChange();
+    if (vv) {
+      vv.addEventListener("resize", onChange);
+      vv.addEventListener("scroll", onChange);
+      onChange();
+    }
     return () => {
-      vv.removeEventListener("resize", onChange);
-      vv.removeEventListener("scroll", onChange);
+      if (vv) {
+        vv.removeEventListener("resize", onChange);
+        vv.removeEventListener("scroll", onChange);
+      }
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
     };
   }, []);
-  return inset;
+  return vp;
 }
 
 function ConfettiCanvas() {
@@ -97,7 +110,7 @@ type FeedItem = {
   timestamp: number;
 };
 
-function ChatOverlay({ inset }: { inset: number }) {
+function ChatOverlay() {
   const { chatMessages } = useChat();
   const participants = useParticipants();
   const [now, setNow] = useState(() => Date.now());
@@ -163,10 +176,7 @@ function ChatOverlay({ inset }: { inset: number }) {
   }, [chatMessages, joins, now]);
 
   return (
-    <div
-      style={{ transform: `translateY(-${inset}px)` }}
-      className="absolute left-3 right-20 bottom-28 z-20 flex flex-col items-start gap-1.5 pointer-events-none transition-transform duration-150"
-    >
+    <div className="absolute left-3 right-20 bottom-28 z-20 flex flex-col items-start gap-1.5 pointer-events-none">
       {feed.map((it) => {
         const age = now - it.timestamp;
         const opacity =
@@ -435,7 +445,7 @@ function BottomBar({ isHost }: { isHost: boolean }) {
 }
 
 export function StreamPlayer({ isHost = false }) {
-  const keyboardInset = useKeyboardInset();
+  const vp = useVisualViewport();
   const [following, setFollowing] = useState(false);
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack>();
   const localVideoEl = useRef<HTMLVideoElement>(null);
@@ -493,7 +503,16 @@ export function StreamPlayer({ isHost = false }) {
   );
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-black">
+    <div
+      style={{
+        position: "fixed",
+        left: 0,
+        right: 0,
+        top: vp.top,
+        height: vp.height,
+      }}
+      className="overflow-hidden bg-black"
+    >
       <Grid className="absolute inset-0 w-full h-full">
         {canHost && (
           <div className="relative">
@@ -605,13 +624,10 @@ export function StreamPlayer({ isHost = false }) {
         </Flex>
       </div>
 
-      <ChatOverlay inset={keyboardInset} />
+      <ChatOverlay />
       {!isHost && <RightRail />}
 
-      <div
-        style={{ transform: `translateY(-${keyboardInset}px)` }}
-        className="absolute bottom-0 inset-x-0 p-3 z-30 transition-transform duration-150"
-      >
+      <div className="absolute bottom-0 inset-x-0 p-3 z-30">
         <BottomBar isHost={isHost} />
       </div>
     </div>
