@@ -3,7 +3,7 @@
 import { Auction, supabase } from "@/lib/supabase";
 import { useLocalParticipant, useRoomContext } from "@livekit/components-react";
 import { Button, Dialog, Flex, Text, TextField } from "@radix-ui/themes";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Product = {
   id: string;
@@ -81,8 +81,8 @@ function StartAuctionDialog({
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Product | null>(null);
   const [price, setPrice] = useState("");
-  const [increment, setIncrement] = useState("10");
-  const [duration, setDuration] = useState("30");
+  const [increment, setIncrement] = useState("50");
+  const [duration, setDuration] = useState("15");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -103,7 +103,7 @@ function StartAuctionDialog({
 
   const pick = (p: Product) => {
     setSelected(p);
-    setPrice(p.price != null ? String(p.price) : "");
+    setPrice(p.price != null ? String(Math.round(p.price * 0.6)) : "");
   };
 
   const start = async () => {
@@ -225,6 +225,76 @@ function StartAuctionDialog({
   );
 }
 
+function SlideToBid({
+  label,
+  onConfirm,
+  disabled,
+}: {
+  label: string;
+  onConfirm: () => void;
+  disabled?: boolean;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [x, setX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const HANDLE = 52;
+
+  const maxX = () =>
+    Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE);
+
+  const onDown = (e: React.PointerEvent) => {
+    if (disabled) return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setDragging(true);
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (!dragging || !trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    const nx = Math.max(0, Math.min(maxX(), e.clientX - rect.left - HANDLE / 2));
+    setX(nx);
+  };
+  const finish = () => {
+    if (!dragging) return;
+    setDragging(false);
+    const reached = x >= maxX() * 0.9 && maxX() > 0;
+    setX(0);
+    if (reached) onConfirm();
+  };
+
+  return (
+    <div
+      ref={trackRef}
+      style={{ touchAction: "none" }}
+      className="relative h-[52px] rounded-full bg-white/15 overflow-hidden select-none"
+    >
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-14">
+        <Text size="2" weight="bold" className="text-white/90 truncate">
+          {label}
+        </Text>
+      </div>
+      <div
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={finish}
+        onPointerCancel={finish}
+        style={{
+          width: HANDLE,
+          height: HANDLE,
+          transform: `translateX(${x}px)`,
+          touchAction: "none",
+        }}
+        className={
+          "absolute left-0 top-0 rounded-full bg-accent-9 flex items-center justify-center text-black text-xl font-bold " +
+          (disabled ? "opacity-50" : "") +
+          (dragging ? "" : " transition-transform")
+        }
+      >
+        →
+      </div>
+    </div>
+  );
+}
+
 export function AuctionBar({ isHost }: { isHost: boolean }) {
   const { name: roomName } = useRoomContext();
   const { localParticipant } = useLocalParticipant();
@@ -301,15 +371,13 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
           </Flex>
         </Flex>
         {!isHost && (
-          <Button
-            size="3"
-            radius="full"
-            className="w-full mt-2"
-            disabled={busy}
-            onClick={bid}
-          >
-            {busy ? "..." : `Pujar $${nextBid.toLocaleString()}`}
-          </Button>
+          <div className="mt-2">
+            <SlideToBid
+              label={busy ? "Pujando..." : `Desliza para pujar $${nextBid.toLocaleString()}`}
+              onConfirm={bid}
+              disabled={busy}
+            />
+          </div>
         )}
         {err && (
           <Text as="div" size="1" className="text-red-9 mt-1">
