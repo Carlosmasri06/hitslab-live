@@ -38,6 +38,7 @@ import {
   createLocalTracks,
 } from "livekit-client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AuctionBar } from "./auction";
 import { PresenceDialog } from "./presence-dialog";
 import { useAuthToken } from "./token-context";
 
@@ -627,8 +628,11 @@ export function StreamPlayer({ isHost = false }) {
         <ChatOverlay />
         {!isHost && <RightRail />}
 
-        <div className="absolute bottom-0 inset-x-0 p-3 z-30 pointer-events-auto">
-          <BottomBar isHost={isHost} />
+        <div className="absolute bottom-0 inset-x-0 p-3 z-30 pointer-events-none">
+          <AuctionBar isHost={isHost} />
+          <div className="pointer-events-auto">
+            <BottomBar isHost={isHost} />
+          </div>
         </div>
       </div>
     </>
