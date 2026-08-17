@@ -1,7 +1,7 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
-import { Button, Flex, Heading, Text, TextField } from "@radix-ui/themes";
+import { Button, Flex, Heading, Text } from "@radix-ui/themes";
 import {
   Elements,
   PaymentElement,
@@ -21,6 +21,12 @@ const GOLD_OUTLINE = {
   outline: "2px solid #f5b301",
   outlineOffset: "3px",
 } as const;
+
+const HL_INPUT_CSS = `
+.hl-input{width:100%;box-sizing:border-box;font-size:16px;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);border-radius:12px;color:#fff;outline:none;transition:border-color .15s ease;-webkit-appearance:none;}
+.hl-input::placeholder{color:rgba(255,255,255,0.4);}
+.hl-input:focus{border-color:#f5b301;}
+`;
 
 export type Bidder = {
   has_payment: boolean;
@@ -104,7 +110,7 @@ function AuthStep({ onDone }: { onDone: () => void }) {
         void submit();
       }}
     >
-      <Flex direction="column" gap="3">
+      <Flex direction="column" gap="4">
         <Flex direction="column" gap="2" className="mb-1">
           <Text size="2" className="text-white/70">
             ✓ Puja en vivo por cartas exclusivas
@@ -116,9 +122,8 @@ function AuthStep({ onDone }: { onDone: () => void }) {
             ✓ Envío a domicilio en cuanto ganes
           </Text>
         </Flex>
-        <TextField.Input
-          size="3"
-          style={{ fontSize: 16 }}
+        <input
+          className="hl-input"
           type="email"
           inputMode="email"
           autoComplete="email"
@@ -133,10 +138,9 @@ function AuthStep({ onDone }: { onDone: () => void }) {
             }
           }}
         />
-        <TextField.Input
+        <input
           ref={pwRef}
-          size="3"
-          style={{ fontSize: 16 }}
+          className="hl-input"
           type="password"
           autoComplete={mode === "signup" ? "new-password" : "current-password"}
           enterKeyHint="go"
@@ -281,7 +285,6 @@ function AddressStep({ onDone }: { onDone: () => void }) {
     (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
       setF({ ...f, [k]: e.target.value });
 
-  const S = { fontSize: 16 } as const;
   const ok =
     !!f.ship_name &&
     !!f.ship_phone &&
@@ -312,20 +315,20 @@ function AddressStep({ onDone }: { onDone: () => void }) {
         void save();
       }}
     >
-      <Flex direction="column" gap="3">
-        <TextField.Input size="3" style={S} enterKeyHint="next" autoComplete="name" placeholder="Nombre completo" value={f.ship_name} onChange={upd("ship_name")} />
-        <TextField.Input size="3" style={S} enterKeyHint="next" inputMode="tel" autoComplete="tel" placeholder="Teléfono" value={f.ship_phone} onChange={upd("ship_phone")} />
-        <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Calle" value={f.ship_street} onChange={upd("ship_street")} />
-        <Flex gap="2">
-          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="No. ext" value={f.ship_ext} onChange={upd("ship_ext")} />
-          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="No. int (opc)" value={f.ship_int} onChange={upd("ship_int")} />
+      <Flex direction="column" gap="4">
+        <input className="hl-input" enterKeyHint="next" autoComplete="name" placeholder="Nombre completo" value={f.ship_name} onChange={upd("ship_name")} />
+        <input className="hl-input" enterKeyHint="next" inputMode="tel" autoComplete="tel" placeholder="Teléfono" value={f.ship_phone} onChange={upd("ship_phone")} />
+        <input className="hl-input" enterKeyHint="next" placeholder="Calle" value={f.ship_street} onChange={upd("ship_street")} />
+        <Flex gap="3">
+          <input className="hl-input" style={{ flex: "1 1 0", minWidth: 0 }} enterKeyHint="next" placeholder="No. ext" value={f.ship_ext} onChange={upd("ship_ext")} />
+          <input className="hl-input" style={{ flex: "1 1 0", minWidth: 0 }} enterKeyHint="next" placeholder="No. int (opc)" value={f.ship_int} onChange={upd("ship_int")} />
         </Flex>
-        <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Colonia" value={f.ship_neighborhood} onChange={upd("ship_neighborhood")} />
-        <Flex gap="2">
-          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Ciudad" value={f.ship_city} onChange={upd("ship_city")} />
-          <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Estado" value={f.ship_state} onChange={upd("ship_state")} />
+        <input className="hl-input" enterKeyHint="next" placeholder="Colonia" value={f.ship_neighborhood} onChange={upd("ship_neighborhood")} />
+        <Flex gap="3">
+          <input className="hl-input" style={{ flex: "1 1 0", minWidth: 0 }} enterKeyHint="next" placeholder="Ciudad" value={f.ship_city} onChange={upd("ship_city")} />
+          <input className="hl-input" style={{ flex: "1 1 0", minWidth: 0 }} enterKeyHint="next" placeholder="Estado" value={f.ship_state} onChange={upd("ship_state")} />
         </Flex>
-        <TextField.Input size="3" style={S} enterKeyHint="done" inputMode="numeric" autoComplete="postal-code" placeholder="Código postal" value={f.ship_zip} onChange={upd("ship_zip")} />
+        <input className="hl-input" enterKeyHint="done" inputMode="numeric" autoComplete="postal-code" placeholder="Código postal" value={f.ship_zip} onChange={upd("ship_zip")} />
         <Button type="submit" size="4" style={GOLD_OUTLINE} disabled={busy || !ok}>
           {busy ? "Guardando..." : "Guardar y empezar a pujar"}
         </Button>
@@ -396,6 +399,7 @@ export function AccountGate({
           "radial-gradient(130% 60% at 50% 0%, rgba(245,158,11,0.18), rgba(10,10,10,0) 55%), #0a0a0a",
       }}
     >
+      <style>{HL_INPUT_CSS}</style>
       <button
         onClick={() => onOpenChange(false)}
         className="fixed top-4 right-5 z-10 text-3xl leading-none text-white/60"
