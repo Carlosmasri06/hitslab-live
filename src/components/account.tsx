@@ -390,33 +390,32 @@ export function AccountGate({
           "radial-gradient(130% 60% at 50% 0%, rgba(245,158,11,0.18), rgba(10,10,10,0) 55%), #0a0a0a",
       }}
     >
-      <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-10 pt-5">
-        <button
-          onClick={() => onOpenChange(false)}
-          className="self-end text-2xl leading-none text-white/60"
-          aria-label="Cerrar"
-        >
-          ✕
-        </button>
+      <button
+        onClick={() => onOpenChange(false)}
+        className="fixed top-4 right-5 z-10 text-3xl leading-none text-white/60"
+        aria-label="Cerrar"
+      >
+        ✕
+      </button>
 
-        <img
-          src="/hitslab-logo.png"
-          alt="HITS LAB"
-          className="mx-auto h-24 w-auto drop-shadow"
-        />
-
-        <div className="mt-3 text-center">
-          <Heading size="7" className="text-white">
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-7 px-6 py-16">
+        <div className="flex flex-col items-center gap-3">
+          <img
+            src="/hitslab-logo.png"
+            alt="HITS LAB"
+            className="h-28 w-auto drop-shadow"
+          />
+          <Heading size="8" align="center" className="text-white">
             {TITLES[step]}
           </Heading>
-          <Text as="div" size="2" className="mt-1 text-white/60">
+          <Text as="div" size="3" align="center" className="text-white/60">
             {SUBS[step]}
           </Text>
         </div>
 
         <Steps step={step} />
 
-        <div className="mt-6">
+        <div>
           {step === "auth" && <AuthStep onDone={refresh} />}
           {step === "card" && <CardStep onDone={refresh} />}
           {step === "address" && <AddressStep onDone={refresh} />}
@@ -435,7 +434,7 @@ export function AccountGate({
         {step === "auth" && (
           <button
             onClick={() => onOpenChange(false)}
-            className="mt-6 text-center text-sm text-white/40"
+            className="text-center text-sm text-white/40"
           >
             Solo quiero ver el en vivo →
           </button>
