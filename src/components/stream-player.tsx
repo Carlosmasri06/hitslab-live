@@ -301,6 +301,21 @@ function CameraControls() {
   const [camEnabled, setCamEnabled] = useState(true);
   const { state: roomState } = useRoomContext();
   const { localParticipant } = useLocalParticipant();
+  const authToken = useAuthToken();
+  const [ending, setEnding] = useState(false);
+  const endLive = async () => {
+    if (!window.confirm("¿Terminar el live? Se cerrará para todos.")) return;
+    setEnding(true);
+    try {
+      await fetch("/api/stop_stream", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+    } catch {
+      // ignore
+    }
+    window.location.href = "/";
+  };
 
   useEffect(() => {
     if (roomState === ConnectionState.Connected) {
@@ -393,6 +408,16 @@ function CameraControls() {
           })}
         </Flex>
       )}
+      <Button
+        size="1"
+        radius="full"
+        color="red"
+        variant="solid"
+        disabled={ending}
+        onClick={endLive}
+      >
+        {ending ? "Terminando…" : "⏹ Terminar"}
+      </Button>
     </Flex>
   );
 }
