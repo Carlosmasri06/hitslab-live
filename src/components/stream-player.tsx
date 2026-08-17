@@ -39,6 +39,7 @@ import {
 } from "livekit-client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AuctionBar } from "./auction";
+import { AccountGate, useBidder } from "./account";
 import { PresenceDialog } from "./presence-dialog";
 import { useAuthToken } from "./token-context";
 
@@ -245,6 +246,8 @@ function ChatOverlay({ bottomOffset }: { bottomOffset: number }) {
 function RightRail({ bottomOffset }: { bottomOffset: number }) {
   const [_, copy] = useCopyToClipboard();
   const { name: roomName } = useRoomContext();
+  const { user, bidder, refresh } = useBidder();
+  const [walletOpen, setWalletOpen] = useState(false);
 
   const share = () => {
     const base =
@@ -259,6 +262,7 @@ function RightRail({ bottomOffset }: { bottomOffset: number }) {
   };
 
   return (
+    <>
     <div
       style={{ bottom: bottomOffset }}
       className="absolute right-3 z-20 flex flex-col items-center gap-5 pointer-events-auto"
@@ -275,9 +279,12 @@ function RightRail({ bottomOffset }: { bottomOffset: number }) {
         </Text>
       </Flex>
       <Flex direction="column" align="center" gap="1">
-        <div className="h-11 w-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center text-xl">
+        <button
+          onClick={() => setWalletOpen(true)}
+          className="h-11 w-11 rounded-full bg-black/45 backdrop-blur flex items-center justify-center text-xl"
+        >
           💳
-        </div>
+        </button>
         <Text size="1" className="text-white">
           Wallet
         </Text>
@@ -296,6 +303,14 @@ function RightRail({ bottomOffset }: { bottomOffset: number }) {
         </Text>
       </Flex>
     </div>
+    <AccountGate
+      open={walletOpen}
+      onOpenChange={setWalletOpen}
+      user={user}
+      bidder={bidder}
+      refresh={refresh}
+    />
+    </>
   );
 }
 
