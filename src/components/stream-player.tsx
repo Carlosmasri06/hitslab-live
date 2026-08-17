@@ -310,7 +310,7 @@ function CameraControls() {
   }, [micEnabled, camEnabled, localParticipant, roomState]);
 
   const { devices, activeDeviceId, setActiveMediaDevice } =
-    useMediaDeviceSelect({ kind: "videoinput" });
+    useMediaDeviceSelect({ kind: "videoinput", requestPermissions: false });
 
   const isFront = (label: string) => label.toLowerCase().includes("front");
   const frontDevices = devices.filter((d) => isFront(d.label));
@@ -498,7 +498,7 @@ export function StreamPlayer({ isHost = false }) {
   }, [canHost]);
 
   const { devices: cameraDevices, activeDeviceId: activeCameraDeviceId } =
-    useMediaDeviceSelect({ kind: "videoinput" });
+    useMediaDeviceSelect({ kind: "videoinput", requestPermissions: false });
 
   useEffect(() => {
     if (localVideoTrack) {
