@@ -550,7 +550,17 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
             )}
             {chargeStatus === "fallido" && (
               <Text as="div" size="1" className="text-red-9">
-                ⚠️ Pago no cobrado
+                ⚠️ La tarjeta no se pudo cobrar
+              </Text>
+            )}
+            {chargeStatus === "sin_tarjeta" && (
+              <Text as="div" size="1" className="text-red-9">
+                ⚠️ El ganador no tiene tarjeta guardada
+              </Text>
+            )}
+            {!chargeStatus && auction!.current_bidder && (
+              <Text as="div" size="1" className="text-white/50">
+                Procesando cobro…
               </Text>
             )}
           </div>
