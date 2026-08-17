@@ -637,12 +637,33 @@ export function StreamPlayer({ isHost = false }) {
               </button>
             )}
           </Flex>
-          <PresenceDialog isHost={isHost}>
+          {isHost ? (
+            <PresenceDialog isHost={isHost}>
+              <div className="relative">
+                <Button
+                  size="1"
+                  variant="soft"
+                  radius="full"
+                  disabled={roomState !== ConnectionState.Connected}
+                >
+                  {roomState === ConnectionState.Connected ? (
+                    <EyeOpenIcon />
+                  ) : (
+                    <EyeClosedIcon />
+                  )}
+                  {roomState === ConnectionState.Connected
+                    ? participants.length
+                    : ""}
+                </Button>
+              </div>
+            </PresenceDialog>
+          ) : (
             <div className="relative">
               <Button
                 size="1"
                 variant="soft"
                 radius="full"
+                style={{ pointerEvents: "none" }}
                 disabled={roomState !== ConnectionState.Connected}
               >
                 {roomState === ConnectionState.Connected ? (
@@ -655,7 +676,7 @@ export function StreamPlayer({ isHost = false }) {
                   : ""}
               </Button>
             </div>
-          </PresenceDialog>
+          )}
         </Flex>
       </div>
 
