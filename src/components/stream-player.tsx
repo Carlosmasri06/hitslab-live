@@ -531,9 +531,15 @@ export function StreamPlayer({ isHost = false }) {
     return () => clearInterval(id);
   }, [canHost, mirrorSelf, sendCam]);
 
-  const remoteVideoTracks = useTracks([Track.Source.Camera]).filter(
-    (t) => t.participant.identity !== localParticipant.identity
-  );
+  const allCameraTracks = useTracks([Track.Source.Camera]);
+  const seenRemote = new Set<string>();
+  const remoteVideoTracks = allCameraTracks
+    .filter((t) => t.participant.identity !== localParticipant.identity)
+    .filter((t) => {
+      if (seenRemote.has(t.participant.identity)) return false;
+      seenRemote.add(t.participant.identity);
+      return true;
+    });
   const remoteAudioTracks = useTracks([Track.Source.Microphone]).filter(
     (t) => t.participant.identity !== localParticipant.identity
   );
