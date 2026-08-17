@@ -403,12 +403,15 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
       auction.current_bidder &&
       !settledRef.current.has(auction.id)
     ) {
-      settledRef.current.add(auction.id);
-      fetch("/api/auction/settle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auction_id: auction.id }),
-      }).catch(() => {});
+      const aid = auction.id;
+      settledRef.current.add(aid);
+      setTimeout(() => {
+        fetch("/api/auction/settle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ auction_id: aid }),
+        }).catch(() => {});
+      }, 2000);
     }
   }, [isHost, ended, auction?.id, auction?.current_bidder]);
 
@@ -543,22 +546,22 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
               a {auction!.current_bidder_name} por $
               {Number(auction!.current_price).toLocaleString()}
             </Text>
-            {chargeStatus === "pagado" && (
+            {isHost && chargeStatus === "pagado" && (
               <Text as="div" size="1" style={{ color: "#4ade80" }}>
                 💳 Pago cobrado
               </Text>
             )}
-            {chargeStatus === "fallido" && (
+            {isHost && chargeStatus === "fallido" && (
               <Text as="div" size="1" className="text-red-9">
                 ⚠️ La tarjeta no se pudo cobrar
               </Text>
             )}
-            {chargeStatus === "sin_tarjeta" && (
+            {isHost && chargeStatus === "sin_tarjeta" && (
               <Text as="div" size="1" className="text-red-9">
                 ⚠️ El ganador no tiene tarjeta guardada
               </Text>
             )}
-            {!chargeStatus && auction!.current_bidder && (
+            {isHost && !chargeStatus && auction!.current_bidder && (
               <Text as="div" size="1" className="text-white/50">
                 Procesando cobro…
               </Text>
