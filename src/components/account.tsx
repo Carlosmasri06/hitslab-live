@@ -1,7 +1,7 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
-import { Button, Flex, Heading, Text } from "@radix-ui/themes";
+import { Flex, Heading, Text } from "@radix-ui/themes";
 import {
   Elements,
   PaymentElement,
@@ -17,15 +17,12 @@ const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
 );
 
-const GOLD_OUTLINE = {
-  outline: "2px solid #f5b301",
-  outlineOffset: "3px",
-} as const;
-
 const HL_INPUT_CSS = `
-.hl-input{width:100%;box-sizing:border-box;font-size:16px;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);border-radius:12px;color:#fff;outline:none;transition:border-color .15s ease;-webkit-appearance:none;}
+.hl-input{width:100%;box-sizing:border-box;font-size:16px;padding:16px 18px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);border-radius:14px;color:#fff;outline:none;transition:border-color .15s ease;-webkit-appearance:none;}
 .hl-input::placeholder{color:rgba(255,255,255,0.4);}
 .hl-input:focus{border-color:#f5b301;}
+.hl-btn{width:100%;height:56px;border-radius:9999px;font-weight:700;font-size:16px;background:#f5b301;color:#000;border:none;cursor:pointer;transition:opacity .15s ease;}
+.hl-btn:disabled{opacity:.45;cursor:default;}
 `;
 
 export type Bidder = {
@@ -110,7 +107,7 @@ function AuthStep({ onDone }: { onDone: () => void }) {
         void submit();
       }}
     >
-      <Flex direction="column" gap="4">
+      <Flex direction="column" gap="5">
         <Flex direction="column" gap="2" className="mb-1">
           <Text size="2" className="text-white/70">
             ✓ Puja en vivo por cartas exclusivas
@@ -153,14 +150,13 @@ function AuthStep({ onDone }: { onDone: () => void }) {
             {err}
           </Text>
         )}
-        <Button
+        <button
           type="submit"
-          size="4"
-          style={GOLD_OUTLINE}
+          className="hl-btn"
           disabled={busy || !email || pw.length < 6}
         >
           {busy ? "..." : mode === "signup" ? "Crear cuenta" : "Iniciar sesión"}
-        </Button>
+        </button>
         <button
           type="button"
           className="text-sm text-accent-11 underline"
@@ -214,9 +210,9 @@ function CardInner({ onDone }: { onDone: () => void }) {
           {err}
         </Text>
       )}
-      <Button size="4" style={GOLD_OUTLINE} disabled={busy} onClick={submit}>
+      <button className="hl-btn" disabled={busy} onClick={submit}>
         {busy ? "Guardando..." : "Guardar tarjeta"}
-      </Button>
+      </button>
       <Text size="1" className="text-white/50 text-center">
         🔒 Tus datos van directo y cifrados a Stripe.
       </Text>
@@ -315,7 +311,7 @@ function AddressStep({ onDone }: { onDone: () => void }) {
         void save();
       }}
     >
-      <Flex direction="column" gap="4">
+      <Flex direction="column" gap="5">
         <input className="hl-input" enterKeyHint="next" autoComplete="name" placeholder="Nombre completo" value={f.ship_name} onChange={upd("ship_name")} />
         <input className="hl-input" enterKeyHint="next" inputMode="tel" autoComplete="tel" placeholder="Teléfono" value={f.ship_phone} onChange={upd("ship_phone")} />
         <input className="hl-input" enterKeyHint="next" placeholder="Calle" value={f.ship_street} onChange={upd("ship_street")} />
@@ -329,9 +325,9 @@ function AddressStep({ onDone }: { onDone: () => void }) {
           <input className="hl-input" style={{ flex: "1 1 0", minWidth: 0 }} enterKeyHint="next" placeholder="Estado" value={f.ship_state} onChange={upd("ship_state")} />
         </Flex>
         <input className="hl-input" enterKeyHint="done" inputMode="numeric" autoComplete="postal-code" placeholder="Código postal" value={f.ship_zip} onChange={upd("ship_zip")} />
-        <Button type="submit" size="4" style={GOLD_OUTLINE} disabled={busy || !ok}>
+        <button type="submit" className="hl-btn" disabled={busy || !ok}>
           {busy ? "Guardando..." : "Guardar y empezar a pujar"}
-        </Button>
+        </button>
       </Flex>
     </form>
   );
@@ -408,7 +404,7 @@ export function AccountGate({
         ✕
       </button>
 
-      <div className="mx-auto flex min-h-full w-full max-w-lg flex-col justify-center gap-7 px-6 py-16">
+      <div className="mx-auto flex min-h-full w-full max-w-lg flex-col justify-center gap-8 px-6 py-14">
         <div className="flex flex-col items-center gap-3">
           <img
             src="/hitslab-logo.png"
@@ -434,9 +430,9 @@ export function AccountGate({
               <Text size="3" align="center" className="text-white">
                 Tu cuenta está lista y tu tarjeta guardada de forma segura.
               </Text>
-              <Button size="4" style={GOLD_OUTLINE} onClick={() => onOpenChange(false)}>
+              <button className="hl-btn" onClick={() => onOpenChange(false)}>
                 Empezar a pujar
-              </Button>
+              </button>
             </Flex>
           )}
         </div>
