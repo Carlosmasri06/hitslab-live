@@ -34,7 +34,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "no_winner" });
     }
     // Solo cobra si de verdad ya terminó
-    if (auction.ends_at && new Date(auction.ends_at).getTime() > Date.now()) {
+    if (
+      auction.ends_at &&
+      new Date(auction.ends_at).getTime() > Date.now() + 10000
+    ) {
       return NextResponse.json({ ok: false, error: "not_ended" });
     }
 
