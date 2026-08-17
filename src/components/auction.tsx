@@ -387,9 +387,30 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
   const { user, bidder, canBid, refresh } = useBidder();
   const [gateOpen, setGateOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
+  const settledRef = useRef<Set<string>>(new Set());
 
   const live = !!auction && auction.status === "live" && left > 0;
   const ended = !!auction && auction.status === "live" && left <= 0;
+  const chargeStatus = (
+    auction as unknown as { charge_status?: string } | null
+  )?.charge_status;
+
+  useEffect(() => {
+    if (
+      isHost &&
+      ended &&
+      auction?.id &&
+      auction.current_bidder &&
+      !settledRef.current.has(auction.id)
+    ) {
+      settledRef.current.add(auction.id);
+      fetch("/api/auction/settle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auction_id: auction.id }),
+      }).catch(() => {});
+    }
+  }, [isHost, ended, auction?.id, auction?.current_bidder]);
 
   const nextBid = auction
     ? auction.current_bidder
@@ -522,6 +543,16 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
               a {auction!.current_bidder_name} por $
               {Number(auction!.current_price).toLocaleString()}
             </Text>
+            {chargeStatus === "pagado" && (
+              <Text as="div" size="1" style={{ color: "#4ade80" }}>
+                💳 Pago cobrado
+              </Text>
+            )}
+            {chargeStatus === "fallido" && (
+              <Text as="div" size="1" className="text-red-9">
+                ⚠️ Pago no cobrado
+              </Text>
+            )}
           </div>
         </Flex>
         {isHost && (
