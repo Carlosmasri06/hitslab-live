@@ -402,7 +402,7 @@ export function AccountGate({
         <img
           src="/hitslab-logo.png"
           alt="HITS LAB"
-          className="mx-auto h-16 w-auto drop-shadow"
+          className="mx-auto h-24 w-auto drop-shadow"
         />
 
         <div className="mt-3 text-center">
