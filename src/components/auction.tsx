@@ -89,7 +89,7 @@ function SlideToBid({
   const HANDLE = 48;
 
   const maxX = () =>
-    Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE - 6);
+    Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE - 8);
 
   const onDown = (e: React.PointerEvent) => {
     if (locked) {
@@ -109,7 +109,7 @@ function SlideToBid({
   const finish = () => {
     if (!dragging) return;
     setDragging(false);
-    const reached = x >= maxX() * 0.72 && maxX() > 0;
+    const reached = x >= maxX() * 0.5 && maxX() > 0;
     setX(0);
     if (reached) onConfirm();
   };
@@ -121,17 +121,31 @@ function SlideToBid({
         touchAction: "none",
         background: locked ? "#2e2e2e" : "#f5b301",
       }}
-      className="relative h-[54px] rounded-full overflow-hidden select-none"
+      className="relative h-14 rounded-full overflow-hidden select-none"
     >
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-12">
+      {!locked && (
+        <div
+          className="absolute left-0 top-0 bottom-0 pointer-events-none"
+          style={{ width: x + 24, background: "rgba(255,255,255,0.28)" }}
+        />
+      )}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-16">
         <Text
-          size="3"
+          size="4"
           weight="bold"
           className={"truncate " + (locked ? "text-white/70" : "text-black")}
         >
           {label}
         </Text>
       </div>
+      {!locked && (
+        <div
+          className="absolute right-5 top-0 bottom-0 flex items-center pointer-events-none"
+          style={{ color: "rgba(0,0,0,0.35)", fontSize: 26, fontWeight: 900 }}
+        >
+          »
+        </div>
+      )}
       <div
         onPointerDown={onDown}
         onPointerMove={onMove}
@@ -146,13 +160,20 @@ function SlideToBid({
           boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
         }}
         className={
-          "absolute left-[3px] top-[3px] rounded-full flex items-center justify-center text-2xl font-bold " +
-          (locked ? "text-white/70 " : "text-black ") +
+          "absolute left-[4px] top-[4px] rounded-full flex items-center justify-center " +
           (disabled ? "opacity-50 " : "") +
           (dragging ? "" : "transition-transform")
         }
       >
-        →
+        <span
+          style={{
+            fontSize: 24,
+            fontWeight: 900,
+            color: locked ? "rgba(255,255,255,0.7)" : "#f5b301",
+          }}
+        >
+          »
+        </span>
       </div>
     </div>
   );
@@ -499,7 +520,7 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
               onClick={() => (canBid ? setCustomOpen(true) : setGateOpen(true))}
               disabled={busy}
               style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.22)" }}
-              className="shrink-0 h-[54px] px-5 rounded-full text-sm font-bold text-white"
+              className="shrink-0 h-14 px-5 rounded-full text-sm font-bold text-white"
             >
               Personalizar
             </button>
