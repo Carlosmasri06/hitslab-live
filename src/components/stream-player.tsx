@@ -247,7 +247,10 @@ function RightRail({ bottomOffset }: { bottomOffset: number }) {
   const { name: roomName } = useRoomContext();
 
   const share = () => {
-    const url = `${process.env.NEXT_PUBLIC_SITE_URL}/watch/${roomName}`;
+    const base =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (typeof window !== "undefined" ? window.location.origin : "");
+    const url = `${base}/watch/${roomName}`;
     if (typeof navigator !== "undefined" && (navigator as any).share) {
       void (navigator as any).share({ title: "HITS LAB Live", url });
     } else {
@@ -299,7 +302,7 @@ function RightRail({ bottomOffset }: { bottomOffset: number }) {
 function CameraControls() {
   const [micEnabled, setMicEnabled] = useState(true);
   const [camEnabled, setCamEnabled] = useState(true);
-  const { state: roomState } = useRoomContext();
+  const { state: roomState, name: roomName } = useRoomContext();
   const { localParticipant } = useLocalParticipant();
   const authToken = useAuthToken();
   const [ending, setEnding] = useState(false);
@@ -315,6 +318,22 @@ function CameraControls() {
       // ignore
     }
     window.location.href = "/";
+  };
+
+  const [, copyLink] = useCopyToClipboard();
+  const [copied, setCopied] = useState(false);
+  const shareLink = () => {
+    const base =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (typeof window !== "undefined" ? window.location.origin : "");
+    const url = `${base}/watch/${roomName}`;
+    if (typeof navigator !== "undefined" && (navigator as any).share) {
+      void (navigator as any).share({ title: "HITS LAB Live", url });
+    } else {
+      copyLink(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   useEffect(() => {
@@ -380,6 +399,9 @@ function CameraControls() {
       </Button>
       <Button size="1" radius="full" variant="soft" onClick={flip}>
         🔄 Voltear
+      </Button>
+      <Button size="1" radius="full" variant="soft" onClick={shareLink}>
+        {copied ? "✓ Liga copiada" : "🔗 Liga"}
       </Button>
       {!onFront && zoomOptions.length > 1 && (
         <Flex
