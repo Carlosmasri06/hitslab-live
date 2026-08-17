@@ -86,9 +86,10 @@ function SlideToBid({
   const trackRef = useRef<HTMLDivElement>(null);
   const [x, setX] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const HANDLE = 52;
+  const HANDLE = 46;
 
-  const maxX = () => Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE);
+  const maxX = () =>
+    Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE - 4);
 
   const onDown = (e: React.PointerEvent) => {
     if (locked) {
@@ -108,22 +109,36 @@ function SlideToBid({
   const finish = () => {
     if (!dragging) return;
     setDragging(false);
-    const reached = x >= maxX() * 0.9 && maxX() > 0;
+    const reached = x >= maxX() * 0.72 && maxX() > 0;
     setX(0);
     if (reached) onConfirm();
   };
 
+  const progress = maxX() > 0 ? x / maxX() : 0;
+
   return (
     <div
       ref={trackRef}
-      style={{ touchAction: "none" }}
-      className={
-        "relative h-[52px] rounded-full overflow-hidden select-none " +
-        (locked ? "bg-white/10" : "bg-white/15")
-      }
+      style={{
+        touchAction: "none",
+        background: locked
+          ? "rgba(255,255,255,0.08)"
+          : "linear-gradient(90deg, rgba(245,179,1,0.18), rgba(245,179,1,0.32))",
+        border: locked
+          ? "1px solid rgba(255,255,255,0.12)"
+          : "1px solid rgba(245,179,1,0.55)",
+      }}
+      className="relative h-[50px] rounded-full overflow-hidden select-none"
     >
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-14">
-        <Text size="2" weight="bold" className="text-white/90 truncate">
+      <div
+        className="absolute inset-0 flex items-center justify-center pointer-events-none px-12"
+        style={{ opacity: 1 - progress * 1.4 }}
+      >
+        <Text
+          size="2"
+          weight="bold"
+          className={"truncate " + (locked ? "text-white/70" : "text-amber-300")}
+        >
           {label}
         </Text>
       </div>
@@ -137,10 +152,14 @@ function SlideToBid({
           height: HANDLE,
           transform: `translateX(${x}px)`,
           touchAction: "none",
+          background: locked
+            ? "#4b5563"
+            : "linear-gradient(135deg, #ffd24a, #f5b301)",
+          boxShadow: locked ? "none" : "0 2px 10px rgba(245,179,1,0.5)",
         }}
         className={
-          "absolute left-0 top-0 rounded-full flex items-center justify-center text-xl font-bold " +
-          (locked ? "bg-gray-7 text-gray-11 " : "bg-accent-9 text-black ") +
+          "absolute left-[2px] top-[2px] rounded-full flex items-center justify-center text-2xl font-bold " +
+          (locked ? "text-white/60 " : "text-black ") +
           (disabled ? "opacity-50 " : "") +
           (dragging ? "" : "transition-transform")
         }
@@ -148,6 +167,69 @@ function SlideToBid({
         →
       </div>
     </div>
+  );
+}
+
+function CustomBidDialog({
+  open,
+  onOpenChange,
+  min,
+  busy,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  min: number;
+  busy?: boolean;
+  onConfirm: (amount: number) => void;
+}) {
+  const [val, setVal] = useState("");
+  useEffect(() => {
+    if (open) setVal(String(min));
+  }, [open, min]);
+  const amount = Math.floor(Number(val) || 0);
+  const valid = amount >= min;
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Content style={{ maxWidth: 340 }}>
+        <Dialog.Title>Puja personalizada</Dialog.Title>
+        <Text as="div" size="2" mb="3" className="text-white/60">
+          Mínimo ${min.toLocaleString()}
+        </Text>
+        <input
+          autoFocus
+          inputMode="numeric"
+          value={val}
+          onChange={(e) => setVal(e.target.value.replace(/[^0-9]/g, ""))}
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            fontSize: 22,
+            fontWeight: 700,
+            padding: "12px 16px",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(245,179,1,0.55)",
+            borderRadius: 12,
+            color: "#fff",
+            outline: "none",
+          }}
+        />
+        <Flex gap="2" mt="4" justify="end">
+          <Dialog.Close>
+            <Button variant="soft" color="gray" size="3">
+              Cancelar
+            </Button>
+          </Dialog.Close>
+          <Button
+            size="3"
+            disabled={!valid || busy}
+            onClick={() => onConfirm(amount)}
+          >
+            Pujar ${amount.toLocaleString()}
+          </Button>
+        </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
 
@@ -316,6 +398,7 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
   const [err, setErr] = useState("");
   const { user, bidder, canBid, refresh } = useBidder();
   const [gateOpen, setGateOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
 
   const live = !!auction && auction.status === "live" && left > 0;
   const ended = !!auction && auction.status === "live" && left <= 0;
@@ -326,7 +409,7 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
       : Number(auction.start_price)
     : 0;
 
-  const bid = async () => {
+  const bid = async (amount: number) => {
     if (!auction) return;
     setBusy(true);
     setErr("");
@@ -335,7 +418,7 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
       p_bidder: user?.id ?? localParticipant.identity,
       p_bidder_name:
         bidder?.ship_name || user?.email || localParticipant.identity,
-      p_amount: nextBid,
+      p_amount: amount,
     });
     setBusy(false);
     const res = data as { ok: boolean; error?: string } | null;
@@ -398,21 +481,32 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
           </Flex>
         </Flex>
         {!isHost && (
-          <div className="mt-2">
-            <SlideToBid
-              label={
-                canBid
-                  ? busy
-                    ? "Pujando..."
-                    : `Desliza para pujar $${nextBid.toLocaleString()}`
-                  : "🔒 Agrega tu tarjeta para pujar"
-              }
-              onConfirm={bid}
+          <Flex gap="2" align="center" className="mt-2">
+            <button
+              type="button"
+              onClick={() => (canBid ? setCustomOpen(true) : setGateOpen(true))}
               disabled={busy}
-              locked={!canBid}
-              onLocked={() => setGateOpen(true)}
-            />
-          </div>
+              style={{ border: "1px solid rgba(245,179,1,0.55)" }}
+              className="shrink-0 h-[50px] px-4 rounded-full text-sm font-bold text-amber-300 bg-white/5"
+            >
+              Personalizar
+            </button>
+            <div className="flex-1">
+              <SlideToBid
+                label={
+                  canBid
+                    ? busy
+                      ? "Pujando..."
+                      : `Pujar $${nextBid.toLocaleString()}`
+                    : "🔒 Agrega tu tarjeta"
+                }
+                onConfirm={() => bid(nextBid)}
+                disabled={busy}
+                locked={!canBid}
+                onLocked={() => setGateOpen(true)}
+              />
+            </div>
+          </Flex>
         )}
         {err && (
           <Text as="div" size="1" className="text-red-9 mt-1">
@@ -455,11 +549,35 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
         <StartAuctionDialog roomName={roomName} onStarted={reload} />
       </div>
     );
+  } else if (!isHost) {
+    content = (
+      <div className="pointer-events-auto mb-2 rounded-2xl bg-black/60 backdrop-blur px-4 py-3">
+        <Text
+          as="div"
+          size="2"
+          weight="bold"
+          align="center"
+          className="text-white/60"
+        >
+          Esperando siguiente producto…
+        </Text>
+      </div>
+    );
   }
 
   return (
     <>
       {gate}
+      <CustomBidDialog
+        open={customOpen}
+        onOpenChange={setCustomOpen}
+        min={nextBid}
+        busy={busy}
+        onConfirm={(amt) => {
+          setCustomOpen(false);
+          void bid(amt);
+        }}
+      />
       {content}
     </>
   );
