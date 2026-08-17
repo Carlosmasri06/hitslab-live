@@ -83,10 +83,10 @@ function SlideToBid({
   locked?: boolean;
   onLocked?: () => void;
 }) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const startX = useRef(0);
-  const [progress, setProgress] = useState(0);
+  const startPx = useRef(0);
+  const [x, setX] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const TRAVEL = 80;
 
   const onDown = (e: React.PointerEvent) => {
     if (locked) {
@@ -95,71 +95,88 @@ function SlideToBid({
     }
     if (disabled) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    startX.current = e.clientX;
+    startPx.current = e.clientX;
     setDragging(true);
   };
   const onMove = (e: React.PointerEvent) => {
-    if (!dragging || !trackRef.current) return;
-    const w = trackRef.current.clientWidth || 1;
-    const p = Math.max(0, Math.min(1, (e.clientX - startX.current) / w));
-    setProgress(p);
+    if (!dragging) return;
+    const nx = Math.max(0, Math.min(TRAVEL, e.clientX - startPx.current));
+    setX(nx);
   };
   const finish = () => {
     if (!dragging) return;
     setDragging(false);
-    const reached = progress >= 0.45;
-    setProgress(0);
+    const reached = x >= TRAVEL * 0.82;
+    setX(0);
     if (reached) onConfirm();
   };
 
   return (
     <div
-      ref={trackRef}
-      onPointerDown={onDown}
-      onPointerMove={onMove}
-      onPointerUp={finish}
-      onPointerCancel={finish}
       style={{
         touchAction: "none",
-        background: locked ? "#2e2e2e" : "#f5b301",
         borderRadius: 9999,
+        background: "#1c1c1c",
+        border: locked
+          ? "1px solid rgba(255,255,255,0.12)"
+          : "1px solid rgba(245,179,1,0.45)",
       }}
       className="relative h-14 overflow-hidden select-none"
     >
-      {!locked && progress > 0 && (
+      {!locked && (
         <div
-          className="absolute inset-y-0 left-0 pointer-events-none"
+          className="absolute right-6 top-0 bottom-0 flex items-center pointer-events-none"
           style={{
-            width: `${progress * 100}%`,
-            background: "rgba(0,0,0,0.12)",
+            color: "rgba(245,179,1,0.55)",
+            fontSize: 22,
+            fontWeight: 900,
+            letterSpacing: "-3px",
           }}
-        />
+        >
+          »»
+        </div>
       )}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-14">
+      <div
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={finish}
+        onPointerCancel={finish}
+        style={{
+          position: "absolute",
+          left: 4,
+          top: 4,
+          bottom: 4,
+          width: locked ? "calc(100% - 8px)" : "calc(100% - 88px)",
+          transform: `translateX(${x}px)`,
+          touchAction: "none",
+          borderRadius: 9999,
+          background: locked ? "#555" : "#f5b301",
+          transition: dragging ? "none" : "transform .2s ease",
+          boxShadow: locked ? "none" : "0 2px 8px rgba(0,0,0,0.4)",
+        }}
+        className="flex items-center justify-center gap-1"
+      >
         <Text
           size="4"
           weight="bold"
-          className="truncate"
+          className="truncate px-2"
           style={{ color: locked ? "rgba(255,255,255,0.7)" : "#000" }}
         >
           {label}
         </Text>
+        {!locked && (
+          <span
+            style={{
+              color: "#000",
+              fontSize: 20,
+              fontWeight: 900,
+              letterSpacing: "-3px",
+            }}
+          >
+            »
+          </span>
+        )}
       </div>
-      {!locked && (
-        <div
-          className="absolute right-5 top-0 bottom-0 flex items-center pointer-events-none"
-          style={{
-            color: "#000",
-            fontSize: 26,
-            fontWeight: 900,
-            letterSpacing: "-3px",
-            transform: `translateX(${progress * 18}px)`,
-            transition: dragging ? "none" : "transform .2s ease",
-          }}
-        >
-          »
-        </div>
-      )}
     </div>
   );
 }
