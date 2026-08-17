@@ -414,6 +414,7 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
   const { user, bidder, canBid, refresh } = useBidder();
   const [gateOpen, setGateOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
+  const [shipping, setShipping] = useState<number | null>(null);
   const settledRef = useRef<Set<string>>(new Set());
 
   const live = !!auction && auction.status === "live" && left > 0;
@@ -441,6 +442,34 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
       }, 2000);
     }
   }, [isHost, ended, auction?.id, auction?.current_bidder]);
+
+  const productId = (auction as unknown as { product_id?: string } | null)
+    ?.product_id;
+  useEffect(() => {
+    setShipping(null);
+    const zip = bidder?.ship_zip;
+    if (!live || !productId || !auction?.id || !zip) return;
+    let cancelled = false;
+    fetch("/api/shipping/quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        auction_id: auction.id,
+        zip,
+        state: bidder?.ship_state || "",
+        city: bidder?.ship_city || "",
+        colonia: bidder?.ship_neighborhood || "",
+      }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && d?.ok) setShipping(d.shipping);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [live, auction?.id, productId, bidder?.ship_zip]);
 
   const nextBid = auction
     ? auction.current_bidder
@@ -510,6 +539,11 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
             <Text size="6" weight="bold" className="text-accent-11">
               ${Number(auction!.current_price).toLocaleString()}
             </Text>
+            {shipping != null && (
+              <Text size="1" weight="bold" className="text-white/55">
+                +${shipping.toLocaleString()} de envío
+              </Text>
+            )}
             <Text
               size="1"
               weight="bold"
