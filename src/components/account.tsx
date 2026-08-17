@@ -17,6 +17,11 @@ const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
 );
 
+const GOLD_OUTLINE = {
+  outline: "2px solid #f5b301",
+  outlineOffset: "3px",
+} as const;
+
 export type Bidder = {
   has_payment: boolean;
   ship_name: string | null;
@@ -147,6 +152,7 @@ function AuthStep({ onDone }: { onDone: () => void }) {
         <Button
           type="submit"
           size="4"
+          style={GOLD_OUTLINE}
           disabled={busy || !email || pw.length < 6}
         >
           {busy ? "..." : mode === "signup" ? "Crear cuenta" : "Iniciar sesión"}
@@ -204,7 +210,7 @@ function CardInner({ onDone }: { onDone: () => void }) {
           {err}
         </Text>
       )}
-      <Button size="4" disabled={busy} onClick={submit}>
+      <Button size="4" style={GOLD_OUTLINE} disabled={busy} onClick={submit}>
         {busy ? "Guardando..." : "Guardar tarjeta"}
       </Button>
       <Text size="1" className="text-white/50 text-center">
@@ -306,7 +312,7 @@ function AddressStep({ onDone }: { onDone: () => void }) {
         void save();
       }}
     >
-      <Flex direction="column" gap="2">
+      <Flex direction="column" gap="3">
         <TextField.Input size="3" style={S} enterKeyHint="next" autoComplete="name" placeholder="Nombre completo" value={f.ship_name} onChange={upd("ship_name")} />
         <TextField.Input size="3" style={S} enterKeyHint="next" inputMode="tel" autoComplete="tel" placeholder="Teléfono" value={f.ship_phone} onChange={upd("ship_phone")} />
         <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Calle" value={f.ship_street} onChange={upd("ship_street")} />
@@ -320,7 +326,7 @@ function AddressStep({ onDone }: { onDone: () => void }) {
           <TextField.Input size="3" style={S} enterKeyHint="next" placeholder="Estado" value={f.ship_state} onChange={upd("ship_state")} />
         </Flex>
         <TextField.Input size="3" style={S} enterKeyHint="done" inputMode="numeric" autoComplete="postal-code" placeholder="Código postal" value={f.ship_zip} onChange={upd("ship_zip")} />
-        <Button type="submit" size="4" disabled={busy || !ok}>
+        <Button type="submit" size="4" style={GOLD_OUTLINE} disabled={busy || !ok}>
           {busy ? "Guardando..." : "Guardar y empezar a pujar"}
         </Button>
       </Flex>
@@ -398,7 +404,7 @@ export function AccountGate({
         ✕
       </button>
 
-      <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-7 px-6 py-16">
+      <div className="mx-auto flex min-h-full w-full max-w-lg flex-col justify-center gap-7 px-6 py-16">
         <div className="flex flex-col items-center gap-3">
           <img
             src="/hitslab-logo.png"
@@ -424,7 +430,7 @@ export function AccountGate({
               <Text size="3" align="center" className="text-white">
                 Tu cuenta está lista y tu tarjeta guardada de forma segura.
               </Text>
-              <Button size="4" onClick={() => onOpenChange(false)}>
+              <Button size="4" style={GOLD_OUTLINE} onClick={() => onOpenChange(false)}>
                 Empezar a pujar
               </Button>
             </Flex>
