@@ -389,6 +389,10 @@ export function AccountGate({
     ? "address"
     : "done";
 
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
+
   if (!open) return null;
   if (typeof document === "undefined") return null;
 
@@ -431,12 +435,36 @@ export function AccountGate({
           {step === "card" && <CardStep onDone={refresh} />}
           {step === "address" && <AddressStep onDone={refresh} />}
           {step === "done" && (
-            <Flex direction="column" gap="3">
-              <Text size="3" align="center" className="text-white">
-                Tu cuenta está lista y tu tarjeta guardada de forma segura.
-              </Text>
+            <Flex direction="column" gap="4">
+              <div
+                className="rounded-2xl p-4"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                }}
+              >
+                {user?.email && (
+                  <Text as="div" size="2" mb="1" className="text-white">
+                    📧 {user.email}
+                  </Text>
+                )}
+                <Text as="div" size="2" mb="1" className="text-white">
+                  💳 Tarjeta guardada de forma segura
+                </Text>
+                {bidder?.ship_name && (
+                  <Text as="div" size="2" className="text-white/80">
+                    📦 {bidder.ship_name} · CP {bidder.ship_zip}
+                  </Text>
+                )}
+              </div>
               <button className="hl-btn" onClick={() => onOpenChange(false)}>
-                Empezar a pujar
+                Listo
+              </button>
+              <button
+                onClick={logout}
+                className="text-center text-sm text-white/40"
+              >
+                Cerrar sesión
               </button>
             </Flex>
           )}
