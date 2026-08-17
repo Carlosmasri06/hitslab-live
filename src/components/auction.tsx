@@ -84,12 +84,9 @@ function SlideToBid({
   onLocked?: () => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [x, setX] = useState(0);
+  const startX = useRef(0);
+  const [progress, setProgress] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const HANDLE = 48;
-
-  const maxX = () =>
-    Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE - 8);
 
   const onDown = (e: React.PointerEvent) => {
     if (locked) {
@@ -97,43 +94,52 @@ function SlideToBid({
       return;
     }
     if (disabled) return;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    startX.current = e.clientX;
     setDragging(true);
   };
   const onMove = (e: React.PointerEvent) => {
     if (!dragging || !trackRef.current) return;
-    const rect = trackRef.current.getBoundingClientRect();
-    const nx = Math.max(0, Math.min(maxX(), e.clientX - rect.left - HANDLE / 2));
-    setX(nx);
+    const w = trackRef.current.clientWidth || 1;
+    const p = Math.max(0, Math.min(1, (e.clientX - startX.current) / w));
+    setProgress(p);
   };
   const finish = () => {
     if (!dragging) return;
     setDragging(false);
-    const reached = x >= maxX() * 0.5 && maxX() > 0;
-    setX(0);
+    const reached = progress >= 0.45;
+    setProgress(0);
     if (reached) onConfirm();
   };
 
   return (
     <div
       ref={trackRef}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={finish}
+      onPointerCancel={finish}
       style={{
         touchAction: "none",
         background: locked ? "#2e2e2e" : "#f5b301",
       }}
       className="relative h-14 rounded-full overflow-hidden select-none"
     >
-      {!locked && (
+      {!locked && progress > 0 && (
         <div
-          className="absolute left-0 top-0 bottom-0 pointer-events-none"
-          style={{ width: x + 24, background: "rgba(255,255,255,0.28)" }}
+          className="absolute inset-y-0 left-0 pointer-events-none"
+          style={{
+            width: `${progress * 100}%`,
+            background: "rgba(0,0,0,0.12)",
+          }}
         />
       )}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-16">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-14">
         <Text
           size="4"
           weight="bold"
-          className={"truncate " + (locked ? "text-white/70" : "text-black")}
+          className="truncate"
+          style={{ color: locked ? "rgba(255,255,255,0.7)" : "#000" }}
         >
           {label}
         </Text>
@@ -141,40 +147,18 @@ function SlideToBid({
       {!locked && (
         <div
           className="absolute right-5 top-0 bottom-0 flex items-center pointer-events-none"
-          style={{ color: "rgba(0,0,0,0.35)", fontSize: 26, fontWeight: 900 }}
-        >
-          »
-        </div>
-      )}
-      <div
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={finish}
-        onPointerCancel={finish}
-        style={{
-          width: HANDLE,
-          height: HANDLE,
-          transform: `translateX(${x}px)`,
-          touchAction: "none",
-          background: locked ? "#555" : "#ffffff",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
-        }}
-        className={
-          "absolute left-[4px] top-[4px] rounded-full flex items-center justify-center " +
-          (disabled ? "opacity-50 " : "") +
-          (dragging ? "" : "transition-transform")
-        }
-      >
-        <span
           style={{
-            fontSize: 24,
+            color: "#000",
+            fontSize: 26,
             fontWeight: 900,
-            color: locked ? "rgba(255,255,255,0.7)" : "#f5b301",
+            letterSpacing: "-3px",
+            transform: `translateX(${progress * 18}px)`,
+            transition: dragging ? "none" : "transform .2s ease",
           }}
         >
-          »
-        </span>
-      </div>
+          »»
+        </div>
+      )}
     </div>
   );
 }
