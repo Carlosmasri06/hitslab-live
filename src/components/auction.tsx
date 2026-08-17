@@ -86,10 +86,10 @@ function SlideToBid({
   const trackRef = useRef<HTMLDivElement>(null);
   const [x, setX] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const HANDLE = 46;
+  const HANDLE = 48;
 
   const maxX = () =>
-    Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE - 4);
+    Math.max(0, (trackRef.current?.clientWidth ?? 0) - HANDLE - 6);
 
   const onDown = (e: React.PointerEvent) => {
     if (locked) {
@@ -114,30 +114,20 @@ function SlideToBid({
     if (reached) onConfirm();
   };
 
-  const progress = maxX() > 0 ? x / maxX() : 0;
-
   return (
     <div
       ref={trackRef}
       style={{
         touchAction: "none",
-        background: locked
-          ? "rgba(255,255,255,0.08)"
-          : "linear-gradient(90deg, rgba(245,179,1,0.18), rgba(245,179,1,0.32))",
-        border: locked
-          ? "1px solid rgba(255,255,255,0.12)"
-          : "1px solid rgba(245,179,1,0.55)",
+        background: locked ? "#2e2e2e" : "#f5b301",
       }}
-      className="relative h-[50px] rounded-full overflow-hidden select-none"
+      className="relative h-[54px] rounded-full overflow-hidden select-none"
     >
-      <div
-        className="absolute inset-0 flex items-center justify-center pointer-events-none px-12"
-        style={{ opacity: 1 - progress * 1.4 }}
-      >
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-12">
         <Text
-          size="2"
+          size="3"
           weight="bold"
-          className={"truncate " + (locked ? "text-white/70" : "text-amber-300")}
+          className={"truncate " + (locked ? "text-white/70" : "text-black")}
         >
           {label}
         </Text>
@@ -152,14 +142,12 @@ function SlideToBid({
           height: HANDLE,
           transform: `translateX(${x}px)`,
           touchAction: "none",
-          background: locked
-            ? "#4b5563"
-            : "linear-gradient(135deg, #ffd24a, #f5b301)",
-          boxShadow: locked ? "none" : "0 2px 10px rgba(245,179,1,0.5)",
+          background: locked ? "#555" : "#ffffff",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
         }}
         className={
-          "absolute left-[2px] top-[2px] rounded-full flex items-center justify-center text-2xl font-bold " +
-          (locked ? "text-white/60 " : "text-black ") +
+          "absolute left-[3px] top-[3px] rounded-full flex items-center justify-center text-2xl font-bold " +
+          (locked ? "text-white/70 " : "text-black ") +
           (disabled ? "opacity-50 " : "") +
           (dragging ? "" : "transition-transform")
         }
@@ -448,7 +436,7 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
 
   if (live) {
     content = (
-      <div className="pointer-events-auto mb-2 rounded-2xl bg-black/70 backdrop-blur px-3 py-2">
+      <div className="pointer-events-auto mb-2 rounded-2xl px-3 py-3" style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.08)" }}>
         <Flex align="center" gap="2">
           {auction!.image_url && (
             <img
@@ -468,7 +456,7 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
             </Text>
           </Flex>
           <Flex direction="column" align="end" className="shrink-0">
-            <Text size="5" weight="bold" className="text-accent-11">
+            <Text size="6" weight="bold" className="text-accent-11">
               ${Number(auction!.current_price).toLocaleString()}
             </Text>
             <Text
@@ -486,8 +474,8 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
               type="button"
               onClick={() => (canBid ? setCustomOpen(true) : setGateOpen(true))}
               disabled={busy}
-              style={{ border: "1px solid rgba(245,179,1,0.55)" }}
-              className="shrink-0 h-[50px] px-4 rounded-full text-sm font-bold text-amber-300 bg-white/5"
+              style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.22)" }}
+              className="shrink-0 h-[54px] px-5 rounded-full text-sm font-bold text-white"
             >
               Personalizar
             </button>
@@ -517,7 +505,7 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
     );
   } else if (ended && auction!.current_bidder_name) {
     content = (
-      <div className="pointer-events-auto mb-2 rounded-2xl bg-black/70 backdrop-blur px-3 py-2">
+      <div className="pointer-events-auto mb-2 rounded-2xl px-3 py-3" style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.08)" }}>
         <Flex align="center" gap="2">
           {auction!.image_url && (
             <img
@@ -551,13 +539,16 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
     );
   } else if (!isHost) {
     content = (
-      <div className="pointer-events-auto mb-2 rounded-2xl bg-black/60 backdrop-blur px-4 py-3">
+      <div
+        className="pointer-events-auto mb-2 rounded-full px-4 py-3"
+        style={{ background: "rgba(255,255,255,0.12)" }}
+      >
         <Text
           as="div"
           size="2"
           weight="bold"
           align="center"
-          className="text-white/60"
+          className="text-white/70"
         >
           Esperando siguiente producto…
         </Text>
