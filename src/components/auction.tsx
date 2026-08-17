@@ -292,6 +292,10 @@ function StartAuctionDialog({
       p_increment: Number(increment) || 10,
       p_duration_seconds: Number(duration) || 30,
     });
+    await supabase.rpc("set_auction_product", {
+      p_room: roomName,
+      p_product_id: selected.id,
+    });
     setBusy(false);
     setOpen(false);
     setSelected(null);
