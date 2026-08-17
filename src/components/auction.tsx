@@ -122,8 +122,9 @@ function SlideToBid({
       style={{
         touchAction: "none",
         background: locked ? "#2e2e2e" : "#f5b301",
+        borderRadius: 9999,
       }}
-      className="relative h-14 rounded-full overflow-hidden select-none"
+      className="relative h-14 overflow-hidden select-none"
     >
       {!locked && progress > 0 && (
         <div
@@ -156,7 +157,7 @@ function SlideToBid({
             transition: dragging ? "none" : "transform .2s ease",
           }}
         >
-          »»
+          »
         </div>
       )}
     </div>
@@ -503,8 +504,8 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
               type="button"
               onClick={() => (canBid ? setCustomOpen(true) : setGateOpen(true))}
               disabled={busy}
-              style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.22)" }}
-              className="shrink-0 h-14 px-5 rounded-full text-sm font-bold text-white"
+              style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 9999 }}
+              className="shrink-0 h-14 px-5 text-sm font-bold text-white"
             >
               Personalizar
             </button>
