@@ -29,6 +29,9 @@ export type Bidder = {
   has_payment: boolean;
   ship_name: string | null;
   ship_zip: string | null;
+  ship_state: string | null;
+  ship_city: string | null;
+  ship_neighborhood: string | null;
 } | null;
 
 export function useBidder() {
@@ -39,7 +42,9 @@ export function useBidder() {
   const loadBidder = useCallback(async (uid: string) => {
     const { data } = await supabase
       .from("bidders")
-      .select("has_payment,ship_name,ship_zip")
+      .select(
+        "has_payment,ship_name,ship_zip,ship_state,ship_city,ship_neighborhood"
+      )
       .eq("user_id", uid)
       .maybeSingle();
     setBidder((data as Bidder) ?? null);
