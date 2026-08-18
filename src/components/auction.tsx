@@ -646,14 +646,14 @@ export function AuctionBar({ isHost }: { isHost: boolean }) {
     content = (
       <div
         className="pointer-events-auto mb-2 rounded-full px-4 py-3"
-        style={{ background: "rgba(255,255,255,0.12)" }}
+        style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.12)" }}
       >
         <Text
           as="div"
-          size="2"
+          size="3"
           weight="bold"
           align="center"
-          className="text-white/70"
+          className="text-white"
         >
           Esperando siguiente producto…
         </Text>
