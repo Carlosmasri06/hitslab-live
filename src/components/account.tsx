@@ -1,7 +1,7 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
-import { Flex, Heading, Text } from "@radix-ui/themes";
+import { Flex, Heading, Text, Theme } from "@radix-ui/themes";
 import {
   Elements,
   PaymentElement,
@@ -112,7 +112,7 @@ function AuthStep({ onDone }: { onDone: () => void }) {
         void submit();
       }}
     >
-      <Flex direction="column" gap="5">
+      <Flex direction="column" gap="6">
         <Flex direction="column" gap="2" className="mb-1">
           <Text size="2" className="text-white/70">
             ✓ Puja en vivo por cartas exclusivas
@@ -397,6 +397,7 @@ export function AccountGate({
   if (typeof document === "undefined") return null;
 
   return createPortal(
+    <Theme appearance="dark" accentColor="amber" radius="large">
     <div
       className="fixed inset-0 z-50 overflow-y-auto"
       style={{
@@ -479,7 +480,8 @@ export function AccountGate({
           </button>
         )}
       </div>
-    </div>,
+    </div>
+    </Theme>,
     document.body
   );
 }
