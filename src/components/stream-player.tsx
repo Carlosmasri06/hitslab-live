@@ -329,6 +329,15 @@ function CameraControls() {
     } catch {
       // ignore
     }
+    try {
+      await fetch("/api/live-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_live: false, room: roomName }),
+      });
+    } catch {
+      // ignore
+    }
     window.location.href = "/";
   };
 
@@ -532,6 +541,21 @@ export function StreamPlayer({ isHost = false }) {
   const localVideoEl = useRef<HTMLVideoElement>(null);
 
   const { name: roomName, state: roomState } = useRoomContext();
+
+  // Semáforo EN VIVO: el host manda un "latido" mientras transmite.
+  useEffect(() => {
+    if (!isHost || roomState !== ConnectionState.Connected) return;
+    const ping = () => {
+      fetch("/api/live-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_live: true, room: roomName }),
+      }).catch(() => {});
+    };
+    ping();
+    const id = setInterval(ping, 30000);
+    return () => clearInterval(id);
+  }, [isHost, roomState, roomName]);
   const { localParticipant } = useLocalParticipant();
   const localMetadata = (localParticipant.metadata &&
     JSON.parse(localParticipant.metadata)) as ParticipantMetadata;
