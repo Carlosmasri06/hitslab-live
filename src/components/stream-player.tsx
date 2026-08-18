@@ -250,10 +250,7 @@ function RightRail({ bottomOffset }: { bottomOffset: number }) {
   const [walletOpen, setWalletOpen] = useState(false);
 
   const share = () => {
-    const base =
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      (typeof window !== "undefined" ? window.location.origin : "");
-    const url = `${base}/watch/${roomName}`;
+    const url = `https://live.hitslabtcg.com/watch/${roomName}`;
     if (typeof navigator !== "undefined" && (navigator as any).share) {
       void (navigator as any).share({ title: "HITS LAB Live", url });
     } else {
@@ -338,10 +335,7 @@ function CameraControls() {
   const [, copyLink] = useCopyToClipboard();
   const [copied, setCopied] = useState(false);
   const shareLink = () => {
-    const base =
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      (typeof window !== "undefined" ? window.location.origin : "");
-    const url = `${base}/watch/${roomName}`;
+    const url = `https://live.hitslabtcg.com/watch/${roomName}`;
     if (typeof navigator !== "undefined" && (navigator as any).share) {
       void (navigator as any).share({ title: "HITS LAB Live", url });
     } else {
